@@ -19,5 +19,15 @@ def resolve_title(title):
     else:
         return data["romaji"]
 
+def select_from_results(results, title):
+    print(f'¿Qué quisiste decir con "{title}"? MAL PREGUNTANDO ')
+    for i, anime in enumerate(results):
+        print(i + 1, anime["title"])
+    eleccion = int(input("Ingresa el numero de opcion: "))
+    return results[eleccion - 1]["id"]
 
-print(resolve_title("ghost in the shell"))
+
+
+#Testing
+if __name__ == "__main__":
+    print(resolve_title("ghost in the shell"))

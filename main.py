@@ -1,16 +1,10 @@
-# This is a sample Python script.
+from exporter import read_list
+from mal_client import search_anime
+from resolver import resolve_title, select_from_results
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+acumulador = []
+titles = read_list("anime_list.txt")
+for title in titles:
+    acumulador.append(select_from_results(search_anime(resolve_title(title)), title))
 
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+print(acumulador)
