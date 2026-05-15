@@ -1,21 +1,31 @@
 from normalizer import normalize_title
 from thefuzz import process
 
+from retry import intentar
+
+
 def resolve_title(title):
-    data = normalize_title(title)
+    data, error = intentar(normalize_title, title)
+    if error:
+        return (None, f"Error de red al normalizar: {error}")
+
     is_anime = data["is_anime"]
     ambiguous = data["ambiguous"]
     if is_anime == False:
-        return title
+        return (None, "No es un anime")
     elif ambiguous == True:
         print(f'¿Qué quisiste decir con "{title}"?')
         for i, opcion in enumerate(data["options"]):
-            print(i+1, opcion)
-        eleccion = int(input("Ingresa el numero de opcion: "))
-        return data["options"][eleccion-1]
-
+            print(i + 1, opcion)
+        while True:
+            try:
+                eleccion = int(input("Ingresa el numero de opcion: "))
+                return (data["options"][eleccion - 1], "ok")
+            except (ValueError, IndexError):
+                print("Opción inválida. Intenta de nuevo.")
     else:
-        return data["romaji"]
+        return (data["romaji"], "ok")
+
 
 def select_from_results(results, title, romaji):
     match = process.extractOne(romaji, [a["title"] for a in results])
@@ -26,11 +36,9 @@ def select_from_results(results, title, romaji):
     print(f'¿Qué quisiste decir con "{title}"? MAL PREGUNTANDO ')
     for i, anime in enumerate(results):
         print(i + 1, anime["title"])
-    eleccion = int(input("Ingresa el numero de opcion: "))
-    return results[eleccion - 1]["id"]
-
-
-
-#Testing
-if __name__ == "__main__":
-    print(resolve_title("ghost in the shell"))
+    while True:
+        try:
+            eleccion = int(input("Ingresa el numero de opcion: "))
+            return results[eleccion - 1]["id"]
+        except (ValueError, IndexError):
+            print("Opción inválida. Intenta de nuevo.")

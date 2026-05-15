@@ -11,7 +11,9 @@ def search_anime(query):
     url = "https://api.myanimelist.net/v2/anime?"
     params = {"q": query,
               "limit": 5}
-    r = requests.get(url, headers=headers, params=params)
+    timeout = (10, 120)
+    r = requests.get(url, headers=headers, params=params, timeout=timeout)
+    r.raise_for_status()
     data = r.json()
 
     for i in data["data"]:
@@ -22,8 +24,3 @@ def search_anime(query):
         lista.append(anime)
     return lista
 
-#Testing
-if __name__ == "__main__":
-    query = "naruto"
-    lista =search_anime(query)
-    print(lista)

@@ -6,8 +6,6 @@ def read_list(filepath):
         datos_limpios = [s.strip() for s in datos]
         return datos_limpios
 
-
-
 def export_xml(ids, filepath):
     root = ET.Element("myanimelist")
     tree = ET.ElementTree(root)
@@ -18,7 +16,10 @@ def export_xml(ids, filepath):
         ET.SubElement(anime, "update_on_import").text = "1"
     ET.indent(tree)
     tree.write(filepath, encoding="utf-8", xml_declaration=True)
-#Testing
-if __name__ == "__main__":
-    print (read_list("anime_list.txt"))
-    export_xml([1735, 5114], "output.xml")
+
+def write_bad_list(bad_data, filepath):
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("TITULO | MOTIVO DEL ERROR\n")
+        f.write("-" * 30 + "\n")
+        for title, reason in bad_data:
+            f.write(f"{title} | {reason}\n")

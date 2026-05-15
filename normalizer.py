@@ -23,14 +23,11 @@ def normalize_title(title):
         json={
             "model": "nvidia/nemotron-3-super-120b-a12b:free",
             "messages": [{"role": "user", "content": prompt}]
-        }
+        },
+        timeout=120
     )
+    response.raise_for_status()
     datos = response.json()
     respuesta = datos["choices"][0]["message"]["content"]
     data = json.loads(respuesta)
     return data
-
-#Testing
-if __name__ == "__main__":
-    title= "takt"
-    print(normalize_title(title))
