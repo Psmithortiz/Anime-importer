@@ -6,11 +6,6 @@
     <update_on_import>1</update_on_import>
   </anime>
   <anime>
-    <series_animedb_id>16870</series_animedb_id>
-    <my_status>Completed</my_status>
-    <update_on_import>1</update_on_import>
-  </anime>
-  <anime>
     <series_animedb_id>30</series_animedb_id>
     <my_status>Completed</my_status>
     <update_on_import>1</update_on_import>
@@ -21,7 +16,7 @@
     <update_on_import>1</update_on_import>
   </anime>
   <anime>
-    <series_animedb_id>30778</series_animedb_id>
+    <series_animedb_id>30694</series_animedb_id>
     <my_status>Completed</my_status>
     <update_on_import>1</update_on_import>
   </anime>

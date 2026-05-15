@@ -1,12 +1,10 @@
 from normalizer import normalize_title
-
+from thefuzz import process
 
 def resolve_title(title):
     data = normalize_title(title)
     is_anime = data["is_anime"]
     ambiguous = data["ambiguous"]
-    print(data)
-
     if is_anime == False:
         return title
     elif ambiguous == True:
@@ -19,7 +17,12 @@ def resolve_title(title):
     else:
         return data["romaji"]
 
-def select_from_results(results, title):
+def select_from_results(results, title, romaji):
+    match = process.extractOne(romaji, [a["title"] for a in results])
+    if match[1] >= 80:
+        matched_anime = next(a for a in results if a["title"] == match[0])
+        return matched_anime["id"]
+
     print(f'¿Qué quisiste decir con "{title}"? MAL PREGUNTANDO ')
     for i, anime in enumerate(results):
         print(i + 1, anime["title"])
