@@ -1,15 +1,9 @@
-
-from normalizer_gemini import normalize_title
 from thefuzz import process
 
-from retry import intentar
 
 
-def resolve_title(title):
-    data, error = intentar(normalize_title, title)
-    if error:
-        return (None, f"Error de red al normalizar: {error}")
 
+def resolve_title(title: str, data: dict)->tuple:
     is_anime = data["is_anime"]
     ambiguous = data["ambiguous"]
     if is_anime == False:
