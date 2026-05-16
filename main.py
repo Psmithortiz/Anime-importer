@@ -2,11 +2,13 @@ import sys
 
 from exporter import read_list, export_xml, write_bad_list
 from mal_client import search_anime
-from normalizer_gemini import normalize_titles
 from resolver import resolve_title, select_from_results
 from retry import intentar
 from tqdm import tqdm
 import time
+
+from normalizer_gemini import normalize_titles
+# from normalizer_openrouter import normalize_titles
 
 acumulador = []
 lista_malos = []
@@ -18,8 +20,10 @@ CHUNK_SIZE = 20
 data_total= [] #ACUMULADOR DE LOS CHUNKS
 INICIO= 0
 
+total_chunks = (len(titles) + CHUNK_SIZE - 1) // CHUNK_SIZE
+
 # Itera de 0 a len(titles) con saltos de CHUNK_SIZE
-for inicio in range(INICIO, len(titles), CHUNK_SIZE):
+for inicio in tqdm(range(INICIO, len(titles), CHUNK_SIZE), total=total_chunks, desc="Normalizando"):
     fin = inicio + CHUNK_SIZE
     chunk = titles[inicio:fin]
     resultado_chunk, error = intentar(normalize_titles,chunk) #intenta normalizar 20 ES UNA LAVADORA DE 20 KILOS
@@ -46,7 +50,7 @@ for i, title in tqdm(enumerate(titles, start=1), total=len(titles)):
         continue
     anime_data = select_from_results(results, title, romaji)
     acumulador.append(anime_data)
-    time.sleep(3)
+    time.sleep(1)
 
 export_xml(acumulador, "output.xml")
 write_bad_list(lista_malos, "errores.txt")
