@@ -10,7 +10,7 @@ def search_anime(query):
     lista = []
     url = "https://api.myanimelist.net/v2/anime?"
     params = {"q": query,
-              "limit": 5}
+              "limit": 30}
     timeout = (10, 120)
     r = requests.get(url, headers=headers, params=params, timeout=timeout)
     r.raise_for_status()

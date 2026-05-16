@@ -24,7 +24,7 @@ def resolve_title(title: str, data: dict)->tuple:
 
 def select_from_results(results, title, romaji):
     match = process.extractOne(romaji, [a["title"] for a in results])
-    if match[1] >= 80:
+    if match[1] >= 95:
         matched_anime = next(a for a in results if a["title"] == match[0])
         return (matched_anime["id"], matched_anime["title"])
 
