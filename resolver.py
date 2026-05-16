@@ -1,4 +1,5 @@
-from normalizer import normalize_title
+
+from normalizer_gemini import normalize_title
 from thefuzz import process
 
 from retry import intentar
@@ -31,7 +32,7 @@ def select_from_results(results, title, romaji):
     match = process.extractOne(romaji, [a["title"] for a in results])
     if match[1] >= 80:
         matched_anime = next(a for a in results if a["title"] == match[0])
-        return matched_anime["id"]
+        return (matched_anime["id"], matched_anime["title"])
 
     print(f'¿Qué quisiste decir con "{title}"? MAL PREGUNTANDO ')
     for i, anime in enumerate(results):
@@ -39,6 +40,7 @@ def select_from_results(results, title, romaji):
     while True:
         try:
             eleccion = int(input("Ingresa el numero de opcion: "))
-            return results[eleccion - 1]["id"]
+            chosen = results[eleccion - 1]
+            return (chosen["id"], chosen["title"])
         except (ValueError, IndexError):
             print("Opción inválida. Intenta de nuevo.")

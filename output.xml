@@ -1,22 +1,28 @@
 <?xml version='1.0' encoding='utf-8'?>
 <myanimelist>
+  <myinfo>
+    <user_id>0</user_id>
+    <user_name>importer</user_name>
+    <user_export_type>1</user_export_type>
+    <user_total_anime>3</user_total_anime>
+    <user_total_watching>0</user_total_watching>
+    <user_total_completed>3</user_total_completed>
+    <user_total_onhold>0</user_total_onhold>
+    <user_total_dropped>0</user_total_dropped>
+    <user_total_plantowatch>0</user_total_plantowatch>
+  </myinfo>
   <anime>
-    <series_animedb_id>1735</series_animedb_id>
+    <series_animedb_id>(1735, 'Naruto: Shippuuden')</series_animedb_id>
     <my_status>Completed</my_status>
     <update_on_import>1</update_on_import>
   </anime>
   <anime>
-    <series_animedb_id>30</series_animedb_id>
+    <series_animedb_id>(16498, 'Shingeki no Kyojin')</series_animedb_id>
     <my_status>Completed</my_status>
     <update_on_import>1</update_on_import>
   </anime>
   <anime>
-    <series_animedb_id>16498</series_animedb_id>
-    <my_status>Completed</my_status>
-    <update_on_import>1</update_on_import>
-  </anime>
-  <anime>
-    <series_animedb_id>30694</series_animedb_id>
+    <series_animedb_id>(30694, 'Dragon Ball Super')</series_animedb_id>
     <my_status>Completed</my_status>
     <update_on_import>1</update_on_import>
   </anime>
