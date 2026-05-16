@@ -29,12 +29,20 @@ def select_from_results(results, title, romaji):
         return (matched_anime["id"], matched_anime["title"])
 
     print(f'¿Qué quisiste decir con "{title}"? MAL PREGUNTANDO ')
-    for i, anime in enumerate(results):
+    top_5_matches = process.extract(romaji, [a["title"] for a in results], limit=5)
+    top_5_animes = [
+        next(a for a in results if a["title"] == titulo)
+        for titulo, score in top_5_matches
+    ]
+    for i, anime in enumerate(top_5_animes):
         print(i + 1, anime["title"])
     while True:
         try:
-            eleccion = int(input("Ingresa el numero de opcion: "))
-            chosen = results[eleccion - 1]
+            eleccion = int(input("Ingresa el numero de opcion (1-5): "))
+            if eleccion < 1 or eleccion > len(top_5_animes):
+                print("Fuera de rango. Intenta de nuevo.")
+                continue
+            chosen = top_5_animes[eleccion - 1]
             return (chosen["id"], chosen["title"])
-        except (ValueError, IndexError):
-            print("Opción inválida. Intenta de nuevo.")
+        except ValueError:
+            print("No es un número. Intenta de nuevo.")
