@@ -1,14 +1,13 @@
 import json
 from google import genai
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 client = genai.Client()
 
-
 class BatchValidationError(Exception):
     pass
-
 
 def normalize_titles(titles: list[str]) -> list[dict]:
     titulos_numerados = "\n".join(f"{i}. {titulo}" for i, titulo in enumerate(titles, start=1))
@@ -42,6 +41,17 @@ Output:
   {{"n": 3, "romaji": null, "is_anime": false, "ambiguous": false, "options": []}}
 ]
 
+VERIFICATION REQUIREMENT:
+For each title, you should use Google Search to verify whether it has an anime adaptation, especially when the title looks unfamiliar.
+
+CRITICAL: Before classifying any title as is_anime=false, you MUST first verify with Google Search that no anime adaptation exists. Many anime from 2024-2026 may not appear in your training data. Only return is_anime=false after confirming via search that the title is manga-only, a light novel without anime adaptation, a live-action work, or not an animated production at all.
+
+CRITICAL OUTPUT FORMAT:
+- Your response MUST start with `[` and end with `]`.
+- Return ONLY the JSON array. No explanations, no preamble, no postscript.
+- Do NOT wrap your response in markdown code blocks (no triple backticks, no ```json).
+- Output raw JSON only.
+
 Now normalize these titles:
 
 {titulos_numerados}
@@ -50,13 +60,14 @@ Now normalize these titles:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
-        config={"response_mime_type": "application/json"}
+        config={"tools": [{"google_search": {}}]}
     )
-    data = json.loads(response.text)
+    text = response.text.strip()
+    text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text)
+    data = json.loads(text)
 
     if not isinstance(data, list):
         raise BatchValidationError("No es una lista")
-
     if len(data) != len(titles):
         raise BatchValidationError(f"Lista incompleta, esperados: {len(titles)}, recibidos: {len(data)}")
 

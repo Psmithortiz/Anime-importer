@@ -1,7 +1,7 @@
 import time
 from google.genai.errors import ClientError, ServerError
 from json import JSONDecodeError
-
+import requests
 from normalizer_gemini import BatchValidationError
 
 
@@ -11,9 +11,15 @@ def intentar(func, *args, max_intentos=3, **kwargs):
         try:
             return (func(*args, **kwargs), None)
 
+        except requests.exceptions.HTTPError as e:
+            error_msg = f"Falló: HTTPError {e.response.status_code}"
+            print(f"Intento {intento + 1} falló: HTTPError {e.response.status_code}")
+            if intento < max_intentos - 1:
+                time.sleep(3 * (2 ** intento))
+
         except BatchValidationError as e:
             error_msg = f"Falló: {str(e)}"
-            print(f"Intento {intento + 1} falló: {type(e).__name__}")
+            print(f"Intento {intento + 1} falló: {type(e).__name__} / {e}")
             if intento < max_intentos - 1:
                 time.sleep(5)
 
@@ -36,3 +42,4 @@ def intentar(func, *args, max_intentos=3, **kwargs):
             if intento < max_intentos - 1:
                 time.sleep(3 * (2 ** intento))
     return (None, error_msg)
+
