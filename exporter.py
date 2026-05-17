@@ -7,6 +7,7 @@ def read_list(filepath):
         return datos_limpios
 
 def export_xml(animes, filepath):
+
     root = ET.Element("myanimelist")
     tree = ET.ElementTree(root)
 
@@ -21,9 +22,10 @@ def export_xml(animes, filepath):
     ET.SubElement(myinfo, "user_total_dropped").text = "0"
     ET.SubElement(myinfo, "user_total_plantowatch").text = "0"
 
-    for id in animes:
+    for id, title in animes:
         anime = ET.SubElement(root, "anime")
         ET.SubElement(anime, "series_animedb_id").text = str(id)
+        ET.SubElement(anime, "series_title").text = title
         ET.SubElement(anime, "my_status").text = "Completed"
         ET.SubElement(anime, "update_on_import").text = "1"
     ET.indent(tree)

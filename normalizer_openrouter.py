@@ -46,10 +46,10 @@ Now normalize these titles:
 """
 
     response = requests.post(
-        "meta-llama/llama-3.3-70b-instruct:free",
+        "https://openrouter.ai/api/v1/chat/completions",
         headers={"Authorization": f"Bearer {llave}"},
         json={
-            "model": "deepseek/deepseek-v4-flash:free",
+            "model": "meta-llama/llama-3.3-70b-instruct:free",
             "messages": [{"role": "user", "content": prompt}]
         },
         timeout=120
