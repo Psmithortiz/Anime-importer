@@ -15,7 +15,7 @@ def normalize_titles(titles: list[str]) -> list[dict]:
     prompt = f"""You are an expert anime title normalizer.
     
     CRITICAL CONTEXT: The user has personally watched every title in this list. 
-    THEREFORE, EVERY ITEM IS A CONFIRMED ANIME. Your task is ONLY to normalize the spelling to the official Romaji title used in MyAnimeList.
+    THEREFORE, EVERY ITEM IS A CONFIRMED ANIME. Your task is ONLY to normalize the spelling to the official japanese Romaji title used in MyAnimeList.
 
     For each input title, return a JSON object:
     - "n": input number (integer).
@@ -27,7 +27,7 @@ def normalize_titles(titles: list[str]) -> list[dict]:
     STRICT RULES:
     1. NEVER return "is_anime": false.
     2. If a title has notes like "MANGA?", "S1 S2", or "Novela", ignore the note and normalize the main title.
-    3. Use Google Search to find the exact Romaji/Title string for titles you don't recognize.
+    3. Use Google Search to find the exact japanese Romaji/Title string for titles you don't recognize.
     4. Output raw JSON array only.
     Now normalize these titles:
 

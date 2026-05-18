@@ -12,8 +12,8 @@ def intentar(func, *args, max_intentos=3, **kwargs):
             return (func(*args, **kwargs), None)
 
         except requests.exceptions.HTTPError as e:
-            error_msg = f"Falló: HTTPError {e.response.status_code}"
-            print(f"Intento {intento + 1} falló: HTTPError {e.response.status_code}")
+            error_msg = f"Falló: HTTPError {e.response.status_code} / {e}"
+            print(f"Intento {intento + 1} falló: HTTPError {e.response.status_code} / {e}")
             if intento < max_intentos - 1:
                 time.sleep(3 * (2 ** intento))
 
@@ -21,24 +21,24 @@ def intentar(func, *args, max_intentos=3, **kwargs):
             error_msg = f"Falló: {str(e)}"
             print(f"Intento {intento + 1} falló: {type(e).__name__} / {e}")
             if intento < max_intentos - 1:
-                time.sleep(5)
+                time.sleep(2)
 
         except ClientError as e:
             if e.code == 429:
-                error_msg = f"Falló: ClientError {e.code}"
-                print(f"Intento {intento + 1} falló: {type(e).__name__}")
+                error_msg = f"Falló: ClientError {e.code} / {e}"
+                print(f"Intento {intento + 1} falló: {type(e).__name__} / {e}")
                 print(e)
                 if intento < max_intentos - 1:
-                    time.sleep(60 * (intento + 1))
+                    time.sleep(30 * (intento + 1))
             else:
-                error_msg = f"Falló: ClientError {e.code}"
-                print(f"Intento {intento + 1} falló: {type(e).__name__}")
+                error_msg = f"Falló: ClientError {e.code} / {e}"
+                print(f"Intento {intento + 1} falló: {type(e).__name__} / {e}")
                 if intento < max_intentos - 1:
                     time.sleep(3 * (2 ** intento))
 
         except (ServerError, JSONDecodeError) as e:
-            error_msg = f"Falló: {type(e).__name__}"
-            print(f"Intento {intento + 1} falló: {type(e).__name__}")
+            error_msg = f"Falló: {type(e).__name__} / {e}"
+            print(f"Intento {intento + 1} falló: {type(e).__name__} / {e}")
             if intento < max_intentos - 1:
                 time.sleep(3 * (2 ** intento))
     return (None, error_msg)

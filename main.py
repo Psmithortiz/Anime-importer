@@ -24,7 +24,7 @@ total_chunks = (len(titles) + CHUNK_SIZE - 1) // CHUNK_SIZE  # techo para la bar
 for inicio in tqdm(range(0, len(titles), CHUNK_SIZE), total=total_chunks, desc="Normalizando"):
     fin = inicio + CHUNK_SIZE
     chunk = titles[inicio:fin]
-    resultado_chunk, error = intentar(normalize_titles, chunk)  # intenta normalizar 20 ES UNA LAVADORA DE 20 KILOS
+    resultado_chunk, error = intentar(normalize_titles, chunk)
     if error:
         print(f"Fallo la normalizacion del chunk{inicio}-{fin}: {error}")
         sys.exit(1)
@@ -61,7 +61,7 @@ for i, title in tqdm(enumerate(titles, start=1), total=len(titles)):
         lista_malos.append((title, f"No estuvo entre 5 opciones de MAL, LLM output: {romaji}"))
         continue
     acumulador.append(anime_data)
-    time.sleep(1)
+    time.sleep(0.6)
 
 # EXPORTANDO
 export_xml(acumulador, "output.xml")

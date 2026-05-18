@@ -14,12 +14,12 @@ def resolve_title(title: str, data: dict) -> tuple:
         print(f'¿Qué quisiste decir con "{title}"?(original) LLM pregruntando')
         for i, opcion in enumerate(data["options"]):
             print(f"({i + 1})- {opcion}")
-        print("(X) Descartar")
+        print("(X)  Descartar")
         while True:
             try:
                 eleccion = (input("Ingresa el numero de opcion: "))
                 if eleccion.upper() == "X":
-                    return None
+                    return (None, "Descartado")
                 eleccion = int(eleccion)
                 if eleccion < 1 or eleccion > len(data["options"]):
                     print("Fuera de rango. Intenta de nuevo.")
@@ -50,7 +50,7 @@ def select_from_results(results, title, romaji):
 
     for i, anime in enumerate(top_5_animes):
         print(f"({i + 1})- {anime["title"]}")
-    print("(X) Descartar")
+    print("(X)  Descartar")
     while True:
         try:
             eleccion = (input("Ingresa el numero de opcion (1-5): "))
