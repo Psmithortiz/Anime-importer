@@ -1,3 +1,7 @@
+# Fallback search backend - currently inactive.
+# Switch in main.py by commenting `from jikan_client...` and uncommenting `from mal_client...`
+# Use when Jikan is down or returns inconsistent results.
+
 import requests
 import os
 from dotenv import load_dotenv
