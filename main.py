@@ -1,15 +1,15 @@
 import sys
 import time
 from exporter import read_list, export_xml, write_bad_list
-from mal_client import search_anime
 from resolver import resolve_title, select_from_results
 from retry import intentar
 from tqdm import tqdm
-
-# LLMS
 from normalizer_gemini import normalize_titles
 
-# from normalizer_openrouter import normalize_titles
+
+from jikan_client import search_anime
+
+# from mal_client import search_anime    # fallback - swap if Jikan fails
 
 acumulador = []
 lista_malos = []
@@ -34,14 +34,17 @@ for inicio in tqdm(range(0, len(titles), CHUNK_SIZE), total=total_chunks, desc="
     time.sleep(13)
 data_por_n = {item["n"]: item for item in data_total}
 
-    # RESOLVER
+# RESOLVER
 for i, title in tqdm(enumerate(titles, start=1), total=len(titles)):
     romaji, status = resolve_title(title, data_por_n[i])
     if status != "ok":
         lista_malos.append((title, status))
         continue
+    if not romaji:
+        lista_malos.append((title, f"No estuvo entre opciones de LLM"))
+        continue
 
-        # SEARCH + ERRORES
+    # SEARCH + ERRORES
     results, error = intentar(search_anime, romaji)
     if error:
         lista_malos.append((title, f"Error de red al buscar en MAL: {error}"))
@@ -51,16 +54,16 @@ for i, title in tqdm(enumerate(titles, start=1), total=len(titles)):
         lista_malos.append((title, f"No encontrado en MAL (Query: {romaji})"))
         continue
 
-        #SELECCIONANDO
+    # SELECCIONANDO
     anime_data = select_from_results(results, title, romaji)
 
     if not anime_data:
-        lista_malos.append((title, f"No estuvo entre 5 opciones"))
+        lista_malos.append((title, f"No estuvo entre 5 opciones de MAL, LLM output: {romaji}"))
         continue
     acumulador.append(anime_data)
     time.sleep(1)
 
-    # EXPORTANDO
+# EXPORTANDO
 export_xml(acumulador, "output.xml")
 lista_malos.sort(key=lambda x: x[1])
 write_bad_list(lista_malos, "errores.txt")
