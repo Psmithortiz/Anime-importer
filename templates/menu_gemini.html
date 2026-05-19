@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Selección Gemini</title>
+    <style>
+        ul {
+            list-style: none;
+            padding: 0;
+            text-align: center;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .encabezado {
+            text-align: center;
+                margin-bottom: 30px;
+
+        }
+
+    </style>
+</head>
+<body>
+<div class="encabezado">
+    <h1>¿A cuál te refieres? LLM Preguntando</h1>
+    <p>Titulo original:&nbsp;
+        <a href="..." target="_blank">{{ titulo }}</a>
+    </p>
+    <p>
+        <a href="/elegir-gemini/0">X — Descartar</a>
+    </p>
+</div>
+
+<ul>
+
+    {% for opcion in opciones %}
+        <li>
+            <a href="/elegir-gemini/{{ loop.index }}">
+                {{ loop.index }} — {{ opcion }}
+            </a>
+        </li>
+    {% endfor %}
+
+</ul>
+</body>
+</html>

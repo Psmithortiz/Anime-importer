@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Selección Jikan</title>
+    <style>
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            list-style: none;
+            padding: 0;
+        }
+
+        .grid a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .grid img {
+            width: 30%;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .grid li {
+            text-align: center;
+        }
+
+        .descartar {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .encabezado {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="encabezado">
+<h1>¿A cuál te refieres? MAL/JIKAN Preguntando</h1>
+
+    <p>Titulo original
+        <a href="https://www.google.com/search?q={{ (titulo + ' anime') | urlencode }}" target="_blank">
+            {{ titulo }}
+        </a>
+    </p>
+
+<p>Titulo de busqueda actual segun sugerencia LLM: <strong>{{ romaji_sugerido }}</strong></p>
+</div>
+<li class="descartar">
+    <a href="/elegir-jikan/0">X — DESCARTAR</a>
+</li>
+
+<ul class="grid">
+    {% for opcion in opciones %}
+        <li>
+            <a href="/elegir-jikan/{{ loop.index }}">
+                {{ loop.index }} — {{ opcion.title }}
+                <img src="{{ opcion.imagen }}" alt="{{ opcion.title }}">
+            </a>
+        </li>
+    {% endfor %}
+</ul>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Importación lista</title>
+</head>
+<body>
+<h1>Importación completada</h1>
+
+<p>Procesados correctamente: <strong>{{ total_ok }}</strong></p>
+<p>Errores: <strong>{{ total_malos }}</strong></p>
+
+<p>
+    <a href="/descargar">Descargar output.xml</a>
+</p>
+
+{% if malos %}
+<h2>Lista de errores</h2>
+<ul>
+    {% for titulo, motivo in malos %}
+        <li><strong>{{ titulo }}</strong> — {{ motivo }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+</body>
+</html>
