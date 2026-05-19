@@ -32,7 +32,6 @@ def inicio():
 
 @app.route("/empezar")
 def empezar():
-    global estado
     try:
         titles = read_list("anime_list.txt")
         estado["titulos_originales"] = titles
@@ -75,7 +74,6 @@ def empezar():
 
 
 def buscar_jikan_y_resolver(romaji, original_title):
-    global estado
     results, error = intentar(search_anime, romaji)
     if error:
         estado["lista_malos"].append((original_title, f"Error de red Jikan: {error}"))
@@ -100,7 +98,6 @@ def buscar_jikan_y_resolver(romaji, original_title):
 
 
 def procesar_hasta_proxima_pregunta():
-    global estado
     while estado["indice_actual"] < len(estado["titulos_originales"]):
         estado["indice_actual"] += 1
         i = estado["indice_actual"]
@@ -132,8 +129,6 @@ def procesar_hasta_proxima_pregunta():
 
 @app.route("/preguntar")
 def preguntar():
-    global estado
-
     indice = estado["indice_actual"]
     titulo_original = ""
     if 0 < indice <= len(estado["titulos_originales"]):
@@ -163,8 +158,6 @@ def preguntar():
 
 @app.route("/elegir-gemini/<int:numero>")
 def elegir_gemini(numero):
-    global estado
-
     i = estado["indice_actual"]
     original_title = estado["titulos_originales"][i - 1]
 
@@ -188,8 +181,6 @@ def elegir_gemini(numero):
 
 @app.route("/elegir-jikan/<int:numero>")
 def elegir_jikan(numero):
-    global estado
-
     i = estado["indice_actual"]
     original_title = estado["titulos_originales"][i - 1]
 
@@ -214,8 +205,6 @@ def elegir_jikan(numero):
 
 @app.route("/listo")
 def listo():
-    global estado
-
     estado["lista_malos"].sort(key=lambda x: x[1])
     export_xml(estado["acumulador"], "output.xml")
     write_bad_list(estado["lista_malos"], "errores.txt")
