@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <title>Selección Gemini</title>
@@ -16,17 +16,18 @@
 
         .encabezado {
             text-align: center;
-                margin-bottom: 30px;
-
+            margin-bottom: 30px;
         }
-
     </style>
 </head>
 <body>
 <div class="encabezado">
     <h1>¿A cuál te refieres? LLM Preguntando</h1>
-    <p>Titulo original:&nbsp;
-        <a href="..." target="_blank">{{ titulo }}</a>
+    <p>
+        Título original:&nbsp;
+        <a href="https://www.google.com/search?q={{ (titulo + ' anime') | urlencode }}" target="_blank">
+            {{ titulo }}
+        </a>
     </p>
     <p>
         <a href="/elegir-gemini/0">X — Descartar</a>
@@ -34,15 +35,17 @@
 </div>
 
 <ul>
-
     {% for opcion in opciones %}
         <li>
             <a href="/elegir-gemini/{{ loop.index }}">
                 {{ loop.index }} — {{ opcion }}
             </a>
+            &nbsp;
+            <a href="https://www.google.com/search?q={{ (opcion + ' anime') | urlencode }}" target="_blank">
+                🔍
+            </a>
         </li>
     {% endfor %}
-
 </ul>
 </body>
 </html>
