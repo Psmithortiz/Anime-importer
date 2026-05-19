@@ -9,7 +9,7 @@ from jikan_client import search_anime
 from thefuzz import process
 import time
 
-DEV_MODE = True
+DEV_MODE = False
 
 estado = {
     "titulos_originales": [],
@@ -24,6 +24,7 @@ estado = {
 
 app = Flask(__name__)
 
+
 @app.route("/")
 def inicio():
     return render_template("inicio.html")
@@ -32,8 +33,6 @@ def inicio():
 @app.route("/empezar")
 def empezar():
     global estado
-
-    #LEER TITULOS
     try:
         titles = read_list("anime_list.txt")
         estado["titulos_originales"] = titles
@@ -46,7 +45,6 @@ def empezar():
         estado["datos_gemini"] = {int(k): v for k, v in cache.items()}
         procesar_hasta_proxima_pregunta()
         return redirect("/preguntar")
-
 
     CHUNK_SIZE = 20
     data_total = []
@@ -72,15 +70,12 @@ def empezar():
         with open("gemini_cache.json", "w", encoding="utf-8") as f:
             json.dump(estado["datos_gemini"], f, ensure_ascii=False, indent=2)
 
-    procesar_hasta_proxima_pregunta()   # ← llamarla acá
+    procesar_hasta_proxima_pregunta()
     return redirect("/preguntar")
 
 
 def buscar_jikan_y_resolver(romaji, original_title):
-
     global estado
-
-
     results, error = intentar(search_anime, romaji)
     if error:
         estado["lista_malos"].append((original_title, f"Error de red Jikan: {error}"))
@@ -89,24 +84,19 @@ def buscar_jikan_y_resolver(romaji, original_title):
         estado["lista_malos"].append((original_title, f"No encontrado en Jikan (query: {romaji})"))
         return True
 
-    # 2. Fuzzy match
     match = process.extractOne(romaji, [a["title"] for a in results])
     if match[1] >= 95:
-        # Auto-resuelto
         matched_anime = next(a for a in results if a["title"] == match[0])
         estado["acumulador"].append((matched_anime["id"], matched_anime["title"]))
         return True
 
-    # 3. Score bajo → necesita pregunta
     top_5_matches = process.extract(romaji, [a["title"] for a in results], limit=5)
     top_5_animes = [next(a for a in results if a["title"] == titulo)
                     for titulo, score in top_5_matches]
     estado["fase"] = "jikan"
     estado["opciones_actuales"] = top_5_animes
     estado["romaji_actual"] = romaji
-    return False  # pausó
-
-
+    return False
 
 
 def procesar_hasta_proxima_pregunta():
@@ -136,9 +126,10 @@ def procesar_hasta_proxima_pregunta():
         if not buscar_jikan_y_resolver(romaji, original_title):
             return
 
-
     estado["fase"] = "terminado"
     return
+
+
 @app.route("/preguntar")
 def preguntar():
     global estado
@@ -194,6 +185,7 @@ def elegir_gemini(numero):
     procesar_hasta_proxima_pregunta()
     return redirect("/preguntar")
 
+
 @app.route("/elegir-jikan/<int:numero>")
 def elegir_jikan(numero):
     global estado
@@ -219,6 +211,7 @@ def elegir_jikan(numero):
     procesar_hasta_proxima_pregunta()
     return redirect("/preguntar")
 
+
 @app.route("/listo")
 def listo():
     global estado
@@ -234,6 +227,7 @@ def listo():
         malos=estado["lista_malos"]
     )
 
+
 @app.route("/descargar")
 def descargar():
     return send_file("output.xml", as_attachment=True)
@@ -241,4 +235,3 @@ def descargar():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
