@@ -4,6 +4,7 @@ import os
 from flask import Flask, redirect, render_template, send_file
 from exporter import read_list, export_xml, write_bad_list
 from normalizer_gemini import normalize_titles
+from processing import normalizar_lista_completa
 from retry import intentar
 from jikan_client import search_anime
 from thefuzz import process
@@ -45,25 +46,10 @@ def empezar():
         procesar_hasta_proxima_pregunta()
         return redirect("/preguntar")
 
-    CHUNK_SIZE = 20
-    data_total = []
-
-    for inicio_chunk in range(0, len(titles), CHUNK_SIZE):
-        fin = inicio_chunk + CHUNK_SIZE
-        chunk = titles[inicio_chunk:fin]
-
-        resultado_chunk, error = intentar(normalize_titles, chunk)
-        if error:
-            return f"Fallo la normalización en el bloque {inicio_chunk}-{fin}: {error}"
-
-        for item in resultado_chunk:
-            item["n"] = item["n"] + inicio_chunk
-
-        data_total.extend(resultado_chunk)
-        if inicio_chunk + CHUNK_SIZE < len(titles):
-            time.sleep(13)
-
-    estado["datos_gemini"] = {item["n"]: item for item in data_total}
+    data_por_n, error = normalizar_lista_completa(titles)
+    if error:
+        return error
+    estado["datos_gemini"] = data_por_n
 
     if DEV_MODE:
         with open("gemini_cache.json", "w", encoding="utf-8") as f:

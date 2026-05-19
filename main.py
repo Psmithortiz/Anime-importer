@@ -1,10 +1,11 @@
 import sys
 import time
 from exporter import read_list, export_xml, write_bad_list
+from processing import normalizar_lista_completa
 from resolver import resolve_title, select_from_results
 from retry import intentar
 from tqdm import tqdm
-from normalizer_gemini import normalize_titles
+
 
 
 from jikan_client import search_anime
@@ -15,24 +16,10 @@ acumulador = []
 lista_malos = []
 titles = read_list("anime_list.txt")
 
-CHUNK_SIZE = 20
-data_total = []  # ACUMULADOR DE LOS CHUNKS
-
-total_chunks = (len(titles) + CHUNK_SIZE - 1) // CHUNK_SIZE  # techo para la barra
-
-# Itera de 0 a len(titles) con saltos de CHUNK_SIZE
-for inicio in tqdm(range(0, len(titles), CHUNK_SIZE), total=total_chunks, desc="Normalizando"):
-    fin = inicio + CHUNK_SIZE
-    chunk = titles[inicio:fin]
-    resultado_chunk, error = intentar(normalize_titles, chunk)
-    if error:
-        print(f"Fallo la normalizacion del chunk{inicio}-{fin}: {error}")
-        sys.exit(1)
-    for item in resultado_chunk:
-        item["n"] = item["n"] + inicio
-    data_total.extend(resultado_chunk)
-    time.sleep(13)
-data_por_n = {item["n"]: item for item in data_total}
+data_por_n, error = normalizar_lista_completa(titles)
+if error:
+    print(error)
+    sys.exit(1)
 
 # RESOLVER
 for i, title in tqdm(enumerate(titles, start=1), total=len(titles)):
