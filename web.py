@@ -3,26 +3,28 @@ import os
 
 from flask import Flask, redirect, render_template, send_file
 from exporter import read_list, export_xml, write_bad_list
-from normalizer_gemini import normalize_titles
 from processing import normalizar_lista_completa
 from retry import intentar
 from jikan_client import search_anime
 from thefuzz import process
-import time
 
 DEV_MODE = False
 
-estado = {
-    "titulos_originales": [],
-    "datos_gemini": {},
-    "indice_actual": 0,
-    "fase": None,
-    "opciones_actuales": [],
-    "romaji_actual": None,
-    "acumulador": [],
-    "lista_malos": [],
-}
 
+def estado_inicial() -> dict:
+    return {
+        "titulos_originales": [],
+        "datos_gemini": {},
+        "indice_actual": 0,
+        "fase": None,
+        "opciones_actuales": [],
+        "romaji_actual": None,
+        "acumulador": [],
+        "lista_malos": [],
+    }
+
+
+estado = estado_inicial()
 app = Flask(__name__)
 
 
@@ -206,6 +208,13 @@ def listo():
 @app.route("/descargar")
 def descargar():
     return send_file("output.xml", as_attachment=True)
+
+
+@app.route("/reset")
+def reset():
+    global estado
+    estado = estado_inicial()
+    return redirect("/")
 
 
 if __name__ == "__main__":
