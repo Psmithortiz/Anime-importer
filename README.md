@@ -120,6 +120,15 @@ cleanly and that I chose not to force into MAL.
 
 After the XML upload, MAL confirmed `Total Entries Updated: 305`.
 
+### Unexpected side benefit                                          
+
+While reviewing Gemini's ambiguous menus, I sometimes noticed seasons
+listed that I didn't know existed. Every time I checked, it turned out
+the second season had been recently announced or was already airing
+without my knowing. The normalizer effectively doubles as a passive
+"what's the latest on this franchise?" check, since Gemini's grounding
+pulls fresh info from Google Search on every batch.
+
 ## Development mode
 
 For iterating on the web UI without burning Gemini quota, the app supports a local cache:
@@ -140,8 +149,6 @@ If you have 300+ titles, expect the initial normalization phase to take ~3-5 min
 
 ## TODOs
 
-- [ ] Reset button to clear state without restarting the server
-- [ ] Guard rails for routes accessed without going through `/empezar`
 - [ ] Refactor `web.py` into separate modules (`app.py`, `state.py`)
 - [ ] Extract shared CSS into `static/styles.css`
 - [ ] Use Jinja2 template inheritance for a shared base layout
