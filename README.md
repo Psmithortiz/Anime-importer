@@ -152,8 +152,6 @@ If you have 300+ titles, expect the initial normalization phase to take ~3-5 min
 - [ ] Refactor `web.py` into separate modules (`app.py`, `state.py`)
 - [ ] Extract shared CSS into `static/styles.css`
 - [ ] Use Jinja2 template inheritance for a shared base layout
-- [ ] Type hints across helper functions
-- [ ] Cache Jikan results during a single run to avoid duplicate searches when the user goes back
 
 ## License
 
