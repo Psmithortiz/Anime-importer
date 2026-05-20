@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <title>Selección Jikan</title>
@@ -28,7 +28,6 @@
         }
 
         .descartar {
-            grid-column: 1 / -1;
             text-align: center;
             padding: 20px;
         }
@@ -40,19 +39,21 @@
 </head>
 <body>
 <div class="encabezado">
-<h1>¿A cuál te refieres? MAL/JIKAN Preguntando</h1>
+    <h1>¿A cuál te refieres? MAL/JIKAN Preguntando</h1>
 
-    <p>Titulo original
+    <p>
+        Título original:&nbsp;
         <a href="https://www.google.com/search?q={{ (titulo + ' anime') | urlencode }}" target="_blank">
             {{ titulo }}
         </a>
     </p>
 
-<p>Titulo de busqueda actual segun sugerencia LLM: <strong>{{ romaji_sugerido }}</strong></p>
+    <p>Título de búsqueda actual según sugerencia LLM: <strong>{{ romaji_sugerido }}</strong></p>
+
+    <p class="descartar">
+        <a href="/elegir-jikan/0">X — DESCARTAR</a>
+    </p>
 </div>
-<li class="descartar">
-    <a href="/elegir-jikan/0">X — DESCARTAR</a>
-</li>
 
 <ul class="grid">
     {% for opcion in opciones %}
@@ -64,3 +65,5 @@
         </li>
     {% endfor %}
 </ul>
+</body>
+</html>
