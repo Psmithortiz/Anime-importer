@@ -61,6 +61,25 @@ python main.py
 
 Same pipeline, terminal-based menus. Faster if you trust the defaults, less informative for ambiguous cases.
 
+## Input format notes
+
+The normalizer treats each line in `anime_list.txt` as a single anime entry.
+Personal notes (`MANGA?`, `S1 S2`, `Novela`, etc.) are ignored during normalization.
+
+**Important:** if a line refers to multiple seasons of the same franchise
+(e.g., `Tate no Yuusha S1 S2 S3 S4`), only the main title will be normalized,
+and the result will map to a single MAL entry — not one per season. To import
+all seasons separately, either:
+
+- Split them into multiple lines in `anime_list.txt` before running the importer
+  (e.g., one line per season with its own season suffix), or
+- Add the missing seasons manually to MAL after the import.
+
+This is intentional: per-user notation for multi-season entries varies too much
+(`S1 S2`, `Season 1, 2, 3`, `Temporada 2`, asterisks, circles, etc.) to handle
+reliably in a single prompt, and keeping the normalizer focused on one job
+(spelling normalization) keeps it predictable.
+
 ## How it works
 
 ```
@@ -85,6 +104,21 @@ Export to output.xml
 - **Jikan over MAL's official search API.** MAL v2 search has poor recall for modern anime (2024+). Jikan is a public mirror that returns the same `mal_id` values, so the resulting XML imports cleanly.
 - **State in a global module dict for the web UI.** Single-user local app; sessions and databases would be overkill. The state persists across HTTP requests via simple module-level scope.
 - **Helper functions modify state and return True/False.** Routes orchestrate; helpers don't know about Flask. Clear separation between business logic and HTTP layer.
+- **Shared processing module.** The chunk loop and Gemini normalization logic live in `processing.py` and are reused by both `main.py` and `web.py`, following the `(result, error)` tuple pattern from `retry.intentar()`.
+
+## Results
+
+The importer was run end-to-end on a real personal list of ~309 titles:
+
+![Import completed screen](docs/import-completed.jpg)
+
+305 entries were imported successfully (98.7%). The 4 errors shown were
+manual discards in the Jikan menu — titles whose romaji didn't resolve
+cleanly and that I chose not to force into MAL.
+
+![MAL confirming the import](docs/mal-import-success.jpg)
+
+After the XML upload, MAL confirmed `Total Entries Updated: 305`.
 
 ## Development mode
 
@@ -96,27 +130,6 @@ For iterating on the web UI without burning Gemini quota, the app supports a loc
 
 The cache file is in `.gitignore` and should not be committed.
 
-## File structure
-
-```
-.
-├── web.py                  # Flask app (entry point for web UI)
-├── main.py                 # CLI orchestrator
-├── normalizer_gemini.py    # Gemini batch normalization
-├── jikan_client.py         # Jikan search wrapper
-├── mal_client.py           # Fallback MAL search (currently inactive)
-├── resolver.py             # CLI interactive menus
-├── retry.py                # Retry wrapper with exponential backoff
-├── exporter.py             # File I/O (read list, write XML, write error log)
-├── templates/              # Jinja2 templates for web UI
-│   ├── inicio.html
-│   ├── menu_gemini.html
-│   ├── menu_jikan.html
-│   └── listo.html
-├── anime_list.txt          # Input (gitignored)
-├── output.xml              # Output (gitignored)
-└── errores.txt             # Error log (gitignored)
-```
 
 ## Rate limits
 
@@ -129,7 +142,7 @@ If you have 300+ titles, expect the initial normalization phase to take ~3-5 min
 
 - [ ] Reset button to clear state without restarting the server
 - [ ] Guard rails for routes accessed without going through `/empezar`
-- [ ] Refactor `web.py` into separate modules (`app.py`, `processing.py`, `state.py`)
+- [ ] Refactor `web.py` into separate modules (`app.py`, `state.py`)
 - [ ] Extract shared CSS into `static/styles.css`
 - [ ] Use Jinja2 template inheritance for a shared base layout
 - [ ] Type hints across helper functions
