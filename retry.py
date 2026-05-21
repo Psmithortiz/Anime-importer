@@ -9,7 +9,7 @@ def intentar(func, *args, max_intentos=3, **kwargs):
     error_msg = None
     for intento in range(max_intentos):
         try:
-            return (func(*args, **kwargs), None)
+            return func(*args, **kwargs), None
 
         except requests.exceptions.HTTPError as e:
             error_msg = f"Falló: HTTPError {e.response.status_code} / {e}"
@@ -41,5 +41,4 @@ def intentar(func, *args, max_intentos=3, **kwargs):
             print(f"Intento {intento + 1} falló: {type(e).__name__} / {e}")
             if intento < max_intentos - 1:
                 time.sleep(3 * (2 ** intento))
-    return (None, error_msg)
-
+    return None, error_msg

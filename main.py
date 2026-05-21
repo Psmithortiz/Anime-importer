@@ -6,14 +6,13 @@ from resolver import resolve_title, select_from_results
 from retry import intentar
 from tqdm import tqdm
 
-
-
+# anime clients
 from jikan_client import search_anime
 
 # from mal_client import search_anime    # fallback - swap if Jikan fails
 
-acumulador = []
-lista_malos = []
+acumulador = list[tuple[int, str]] = []
+lista_malos = list[tuple[str, str]] = []
 titles = read_list("anime_list.txt")
 
 data_por_n, error = normalizar_lista_completa(titles)
@@ -36,14 +35,12 @@ for i, title in tqdm(enumerate(titles, start=1), total=len(titles)):
     if error:
         lista_malos.append((title, f"Error de red al buscar en MAL: {error}"))
         continue
-
     if not results:
         lista_malos.append((title, f"No encontrado en MAL (Query: {romaji})"))
         continue
 
     # SELECCIONANDO
     anime_data = select_from_results(results, title, romaji)
-
     if not anime_data:
         lista_malos.append((title, f"No estuvo entre 5 opciones de MAL, LLM output: {romaji}"))
         continue

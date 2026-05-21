@@ -4,20 +4,17 @@ import re
 URL_BASE = "https://api.jikan.moe/v4/anime"
 
 
-def search_anime(query):
+def search_anime(query: str) -> list[dict]:
     lista = []
     query = re.sub(r"[^a-zA-Z0-9 ]", "", query)
     query = query[:64]
-
     params = {
         "q": query,
         "limit": 25
     }
-
     response = requests.get(URL_BASE, params=params, timeout=(10, 120))
     response.raise_for_status()
     data = response.json()
-
     for item in data.get("data", []):
         # PROTECCION NO IMAGEN
         images_data = item.get("images", {})
@@ -29,5 +26,4 @@ def search_anime(query):
             "title": item["title"],
             "imagen": imagen
         })
-
     return lista

@@ -1,16 +1,16 @@
 import xml.etree.ElementTree as ET
 
-def read_list(filepath):
+
+def read_list(filepath: str) -> list[str]:
     with open(filepath, "r", encoding="utf-8") as f:
         datos = f.readlines()
         datos_limpios = [s.strip() for s in datos if s.strip()]
         return datos_limpios
 
-def export_xml(animes, filepath):
 
+def export_xml(animes: list[tuple[int, str]], filepath: str):
     root = ET.Element("myanimelist")
     tree = ET.ElementTree(root)
-
     myinfo = ET.SubElement(root, "myinfo")
     ET.SubElement(myinfo, "user_id").text = "0"
     ET.SubElement(myinfo, "user_name").text = "importer"
@@ -21,7 +21,6 @@ def export_xml(animes, filepath):
     ET.SubElement(myinfo, "user_total_onhold").text = "0"
     ET.SubElement(myinfo, "user_total_dropped").text = "0"
     ET.SubElement(myinfo, "user_total_plantowatch").text = "0"
-
     for id, title in animes:
         anime = ET.SubElement(root, "anime")
         ET.SubElement(anime, "series_animedb_id").text = str(id)
@@ -31,7 +30,8 @@ def export_xml(animes, filepath):
     ET.indent(tree)
     tree.write(filepath, encoding="utf-8", xml_declaration=True)
 
-def write_bad_list(bad_data, filepath):
+
+def write_bad_list(bad_data: list[tuple[str, str]], filepath: str):
     with open(filepath, "w", encoding="utf-8") as f:
         f.write("TITULO | MOTIVO DEL ERROR\n")
         f.write("-" * 30 + "\n")

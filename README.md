@@ -1,19 +1,24 @@
 # Anime Importer
 
-A Python tool that normalizes a messy personal anime list (with typos, mixed Spanish/English/romaji, and personal notes) and imports it into [MyAnimeList](https://myanimelist.net/) via native XML.
+A Python tool that normalizes a messy personal anime list (with typos, mixed Spanish/English/romaji, and personal notes)
+and imports it into [MyAnimeList](https://myanimelist.net/) via native XML.
 
-Two interfaces are available: a **CLI** for batch processing in the terminal, and a **Flask web UI** for interactive resolution of ambiguous titles with poster previews.
+Two interfaces are available: a **CLI** for batch processing in the terminal, and a **Flask web UI** for interactive
+resolution of ambiguous titles with poster previews.
 
 ## Why this exists
 
-I had ~300 anime titles in a Word document, written over years with inconsistent spelling, mixing languages, and personal annotations like `S1 S2`, `MANGA?`, or `Novela`. Manually re-entering them into MAL was not an option. Existing importers expected clean data; this tool handles the mess.
+I had ~300 anime titles in a Word document, written over years with inconsistent spelling, mixing languages, and
+personal annotations like `S1 S2`, `MANGA?`, or `Novela`. Manually re-entering them into MAL was not an option. Existing
+importers expected clean data; this tool handles the mess.
 
 ## Stack
 
 - **Python 3.13**
 - **Flask + Jinja2** — web UI
 - **Google Gemini 2.5 Flash** with Google Search grounding — title normalization
-- **[Jikan API](https://jikan.moe/)** — MyAnimeList search (unofficial mirror, better recall than MAL's official search for modern anime)
+- **[Jikan API](https://jikan.moe/)** — MyAnimeList search (unofficial mirror, better recall than MAL's official search
+  for modern anime)
 - **`thefuzz`** — fuzzy matching against search results
 - **`requests`, `python-dotenv`, `tqdm`**
 
@@ -34,7 +39,8 @@ GEMINI_API_KEY=your_key_here
 MAL_CLIENT_ID=your_client_id_here
 ```
 
-Place your anime list in `anime_list.txt`, one title per line. Notes like `MANGA?`, `S1 S2`, or `Novela` are ignored by the normalizer.
+Place your anime list in `anime_list.txt`, one title per line. Notes like `MANGA?`, `S1 S2`, or `Novela` are ignored by
+the normalizer.
 
 ## Usage
 
@@ -47,6 +53,7 @@ python web.py
 Open `http://127.0.0.1:5000` in your browser and click "EMPEZAR".
 
 The app will:
+
 1. Send your titles to Gemini in batches for romaji normalization
 2. Search each romaji in Jikan
 3. Show you menus only when the AI is uncertain (ambiguous titles) or the fuzzy match score is below threshold
@@ -100,11 +107,17 @@ Export to output.xml
 
 ### Key design decisions
 
-- **"Always-anime" prompt approach.** Every title in the input is something the user has personally watched, so the LLM doesn't need to classify whether it's anime — it just normalizes spelling. This eliminated persistent false negatives on post-cutoff titles.
-- **Jikan over MAL's official search API.** MAL v2 search has poor recall for modern anime (2024+). Jikan is a public mirror that returns the same `mal_id` values, so the resulting XML imports cleanly.
-- **State in a global module dict for the web UI.** Single-user local app; sessions and databases would be overkill. The state persists across HTTP requests via simple module-level scope.
-- **Helper functions modify state and return True/False.** Routes orchestrate; helpers don't know about Flask. Clear separation between business logic and HTTP layer.
-- **Shared processing module.** The chunk loop and Gemini normalization logic live in `processing.py` and are reused by both `main.py` and `web.py`, following the `(result, error)` tuple pattern from `retry.intentar()`.
+- **"Always-anime" prompt approach.** Every title in the input is something the user has personally watched, so the LLM
+  doesn't need to classify whether it's anime — it just normalizes spelling. This eliminated persistent false negatives
+  on post-cutoff titles.
+- **Jikan over MAL's official search API.** MAL v2 search has poor recall for modern anime (2024+). Jikan is a public
+  mirror that returns the same `mal_id` values, so the resulting XML imports cleanly.
+- **State in a global module dict for the web UI.** Single-user local app; sessions and databases would be overkill. The
+  state persists across HTTP requests via simple module-level scope.
+- **Helper functions modify state and return True/False.** Routes orchestrate; helpers don't know about Flask. Clear
+  separation between business logic and HTTP layer.
+- **Shared processing module.** The chunk loop and Gemini normalization logic live in `processing.py` and are reused by
+  both `main.py` and `web.py`, following the `(result, error)` tuple pattern from `retry.intentar()`.
 
 ## Results
 
@@ -120,7 +133,7 @@ cleanly and that I chose not to force into MAL.
 
 After the XML upload, MAL confirmed `Total Entries Updated: 305`.
 
-### Unexpected side benefit                                          
+### Unexpected side benefit
 
 While reviewing Gemini's ambiguous menus, I sometimes noticed seasons
 listed that I didn't know existed. Every time I checked, it turned out
@@ -139,7 +152,6 @@ For iterating on the web UI without burning Gemini quota, the app supports a loc
 
 The cache file is in `.gitignore` and should not be committed.
 
-
 ## Rate limits
 
 - **Gemini 2.5 Flash free tier**: 5 RPM, 20 RPD. Hence the 13s sleep between batches.
@@ -149,7 +161,6 @@ If you have 300+ titles, expect the initial normalization phase to take ~3-5 min
 
 ## TODOs
 
-- [ ] Refactor `web.py` into separate modules (`app.py`, `state.py`)
 - [ ] Extract shared CSS into `static/styles.css`
 - [ ] Use Jinja2 template inheritance for a shared base layout
 
