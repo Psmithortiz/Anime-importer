@@ -11,8 +11,8 @@ from jikan_client import search_anime
 
 # from mal_client import search_anime    # fallback - swap if Jikan fails
 
-acumulador = list[tuple[int, str]] = []
-lista_malos = list[tuple[str, str]] = []
+acumulador: list[tuple[int, str]] = []
+lista_malos: list[tuple[str, str]] = []
 titles = read_list("anime_list.txt")
 
 data_por_n, error = normalizar_lista_completa(titles)
