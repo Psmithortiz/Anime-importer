@@ -234,6 +234,24 @@ button:disabled {
   color: var(--muted);
 }
 
+.tag {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #0c1020;
+}
+
+.tag-airing {
+  background: #5fd38d;
+}
+
+.tag-not_yet_aired {
+  background: var(--warning);
+}
+
 .small-link {
   font-size: 0.8rem;
 }

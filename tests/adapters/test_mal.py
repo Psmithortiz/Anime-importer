@@ -1,7 +1,14 @@
 import pytest
 import requests
 
-from anime_importer.adapters.mal import MalSearcher, parse_search_response, sanitize_query
+from anime_importer.adapters.mal import (
+    MalSearcher,
+    parse_airing_status,
+    parse_media_type,
+    parse_search_response,
+    sanitize_query,
+)
+from anime_importer.domain.models import AiringStatus, MediaType
 from anime_importer.ports import SearchError
 
 
@@ -85,7 +92,7 @@ def test_searcher_sends_header_and_params():
     params = session.calls[0]["params"]
     assert params["q"] == "Naruto"
     assert params["limit"] == 100
-    assert params["fields"] == "alternative_titles"
+    assert params["fields"] == "alternative_titles,media_type,start_season,num_episodes,status"
     assert params["nsfw"] == "true"
 
 
@@ -105,3 +112,68 @@ def test_search_wraps_http_error_in_search_error():
         MalSearcher(client_id="abc", session=FailingSession()).search("Naruto")
 
     assert exc_info.value.__cause__ is error
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("tv", MediaType.TV),
+        ("movie", MediaType.MOVIE),
+        ("ova", MediaType.OVA),
+        ("ona", MediaType.ONA),
+        ("special", MediaType.SPECIAL),
+        ("tv_special", MediaType.SPECIAL),
+        ("music", MediaType.MUSIC),
+        ("cm", MediaType.OTHER),
+        (None, MediaType.OTHER),
+    ],
+)
+def test_parse_media_type(value, expected):
+    assert parse_media_type(value) is expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("finished_airing", AiringStatus.FINISHED),
+        ("currently_airing", AiringStatus.AIRING),
+        ("not_yet_aired", AiringStatus.NOT_YET_AIRED),
+        ("whatever", AiringStatus.UNKNOWN),
+        (None, AiringStatus.UNKNOWN),
+    ],
+)
+def test_parse_airing_status(value, expected):
+    assert parse_airing_status(value) is expected
+
+
+def test_parse_metadata_from_full_node():
+    node = {
+        "id": 1,
+        "title": "A",
+        "media_type": "movie",
+        "start_season": {"year": 2016, "season": "summer"},
+        "num_episodes": 1,
+        "status": "finished_airing",
+    }
+    (candidate,) = parse_search_response({"data": [{"node": node}]})
+
+    assert candidate.media_type is MediaType.MOVIE
+    assert candidate.year == 2016
+    assert candidate.episodes == 1
+    assert candidate.airing_status is AiringStatus.FINISHED
+
+
+def test_parse_metadata_defaults_when_missing():
+    (candidate,) = parse_search_response({"data": [{"node": {"id": 1, "title": "A"}}]})
+
+    assert candidate.media_type is MediaType.OTHER
+    assert candidate.year is None
+    assert candidate.episodes is None
+    assert candidate.airing_status is AiringStatus.UNKNOWN
+
+
+def test_parse_zero_episodes_is_none():
+    node = {"id": 1, "title": "A", "num_episodes": 0}
+    (candidate,) = parse_search_response({"data": [{"node": node}]})
+
+    assert candidate.episodes is None

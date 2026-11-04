@@ -1,4 +1,22 @@
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class MediaType(StrEnum):
+    TV = "tv"
+    MOVIE = "movie"
+    OVA = "ova"
+    ONA = "ona"
+    SPECIAL = "special"
+    MUSIC = "music"
+    OTHER = "other"
+
+
+class AiringStatus(StrEnum):
+    FINISHED = "finished"
+    AIRING = "airing"
+    NOT_YET_AIRED = "not_yet_aired"
+    UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True, slots=True)
@@ -9,6 +27,10 @@ class AnimeCandidate:
     title: str
     image_url: str | None = None
     alternative_titles: tuple[str, ...] = ()
+    media_type: MediaType | None = None
+    year: int | None = None
+    episodes: int | None = None
+    airing_status: AiringStatus = AiringStatus.UNKNOWN
 
 
 @dataclass(frozen=True, slots=True)

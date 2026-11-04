@@ -5,7 +5,7 @@ from collections.abc import Callable
 import requests
 
 from anime_importer.adapters.http import Throttle, http_retry
-from anime_importer.domain.models import AnimeCandidate
+from anime_importer.domain.models import AiringStatus, AnimeCandidate, MediaType
 from anime_importer.ports import SearchError
 
 BASE_URL = "https://api.myanimelist.net/v2"
@@ -17,6 +17,30 @@ def sanitize_query(query: str) -> str:
     spaced = _UNSAFE_CHARS.sub(" ", query)
     collapsed = " ".join(spaced.split())
     return collapsed[:_MAX_QUERY_LENGTH].strip()
+
+
+_MEDIA_TYPES = {
+    "tv": MediaType.TV,
+    "movie": MediaType.MOVIE,
+    "ova": MediaType.OVA,
+    "ona": MediaType.ONA,
+    "special": MediaType.SPECIAL,
+    "tv_special": MediaType.SPECIAL,
+    "music": MediaType.MUSIC,
+}
+_AIRING_STATUSES = {
+    "finished_airing": AiringStatus.FINISHED,
+    "currently_airing": AiringStatus.AIRING,
+    "not_yet_aired": AiringStatus.NOT_YET_AIRED,
+}
+
+
+def parse_media_type(value: str | None) -> MediaType:
+    return _MEDIA_TYPES.get(value or "", MediaType.OTHER)
+
+
+def parse_airing_status(value: str | None) -> AiringStatus:
+    return _AIRING_STATUSES.get(value or "", AiringStatus.UNKNOWN)
 
 
 def parse_search_response(data: dict) -> list[AnimeCandidate]:
@@ -40,6 +64,10 @@ def parse_search_response(data: dict) -> list[AnimeCandidate]:
                 title=node["title"],
                 image_url=picture.get("large") or picture.get("medium"),
                 alternative_titles=alternative_titles,
+                media_type=parse_media_type(node.get("media_type")),
+                year=(node.get("start_season") or {}).get("year"),
+                episodes=node.get("num_episodes") or None,
+                airing_status=parse_airing_status(node.get("status")),
             )
         )
     return candidates
@@ -78,7 +106,7 @@ class MalSearcher:
             params={
                 "q": sanitize_query(query),
                 "limit": 100,
-                "fields": "alternative_titles",
+                "fields": "alternative_titles,media_type,start_season,num_episodes,status",
                 "nsfw": "true",
             },
             timeout=self._timeout,

@@ -179,6 +179,32 @@ function buildPoster(option) {
   return img;
 }
 
+const MEDIA_TYPE_LABELS = {
+  tv: "TV",
+  movie: "Película",
+  ova: "OVA",
+  ona: "ONA",
+  special: "Especial",
+  music: "Música",
+  other: "Otro",
+};
+
+const STATUS_LABELS = { airing: "En emisión", not_yet_aired: "Por estrenar" };
+
+function buildMetaLine(option) {
+  const parts = [];
+  if (option.media_type) parts.push(MEDIA_TYPE_LABELS[option.media_type] || option.media_type);
+  if (option.year) parts.push(String(option.year));
+  if (option.episodes) parts.push(`${option.episodes} eps`);
+  const line = el("div", { className: "card-meta" });
+  if (parts.length > 0) line.append(el("span", { text: parts.join(" · ") }));
+  const statusText = STATUS_LABELS[option.airing_status];
+  if (statusText) {
+    line.append(el("span", { text: statusText, className: `tag tag-${option.airing_status}` }));
+  }
+  return line;
+}
+
 function buildCards(options) {
   const grid = el("div", { className: "cards" });
   for (const option of options) {
@@ -186,6 +212,7 @@ function buildCards(options) {
       buildPoster(option),
       el("span", { text: String(option.number), className: "badge" }),
       el("div", { text: option.label, className: "card-label" }),
+      buildMetaLine(option),
       el("div", { text: `MAL id ${option.mal_id}`, className: "card-meta" }),
       externalLink("Ver en MAL", `https://myanimelist.net/anime/${encodeURIComponent(option.mal_id)}`),
     ]);

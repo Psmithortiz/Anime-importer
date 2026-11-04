@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from anime_importer.domain.models import AiringStatus, MediaType
 from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
 
 SessionStatus = Literal["normalizing", "question", "finished", "failed"]
@@ -20,6 +21,10 @@ class OptionOut(BaseModel):
     label: str
     mal_id: int | None = None
     image_url: str | None = None
+    media_type: MediaType | None = None
+    year: int | None = None
+    episodes: int | None = None
+    airing_status: AiringStatus | None = None
 
 
 class QuestionOut(BaseModel):
@@ -73,6 +78,10 @@ def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
                 label=candidate.title,
                 mal_id=candidate.mal_id,
                 image_url=candidate.image_url,
+                media_type=candidate.media_type,
+                year=candidate.year,
+                episodes=candidate.episodes,
+                airing_status=candidate.airing_status,
             )
             for number, candidate in enumerate(step.options, start=1)
         ],

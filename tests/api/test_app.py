@@ -1,14 +1,22 @@
 from fastapi.testclient import TestClient
 
 from anime_importer.api.app import create_app
-from anime_importer.domain.models import AnimeCandidate, NormalizedTitle
+from anime_importer.domain.models import AiringStatus, AnimeCandidate, MediaType, NormalizedTitle
 from anime_importer.ports import NormalizationError
 from anime_importer.services.import_session import ImportSession
 
 RESULTS = {
     "hellsing": [
         AnimeCandidate(10, "Hellsing", image_url="http://img/10.jpg"),
-        AnimeCandidate(20, "Hellsing", image_url="http://img/20.jpg"),
+        AnimeCandidate(
+            20,
+            "Hellsing",
+            image_url="http://img/20.jpg",
+            media_type=MediaType.TV,
+            year=2001,
+            episodes=13,
+            airing_status=AiringStatus.FINISHED,
+        ),
     ],
 }
 
@@ -151,3 +159,15 @@ def test_static_assets_are_served():
 
     assert client.get("/app.js").status_code == 200
     assert client.get("/styles.css").status_code == 200
+
+
+def test_candidate_option_exposes_mal_metadata():
+    client = _client()
+    session_id = _create(client)
+
+    options = client.get(f"/api/sessions/{session_id}").json()["question"]["options"]
+
+    assert options[1]["media_type"] == "tv"
+    assert options[1]["year"] == 2001
+    assert options[1]["episodes"] == 13
+    assert options[1]["airing_status"] == "finished"
