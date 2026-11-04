@@ -20,6 +20,9 @@ dependencies = [
     "tqdm>=4.70.1",
 ]
 
+[project.scripts]
+anime-importer = "anime_importer.cli:main"
+
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
