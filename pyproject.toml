@@ -1,0 +1,38 @@
+[project]
+name = "anime-importer"
+version = "0.1.0"
+description = "Normalize a messy personal anime list with Gemini and import it into MyAnimeList via a FastAPI web UI"
+readme = "README.md"
+authors = [
+    { name = "Pablo Smith", email = "p.smith.ortiz@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.162.0",
+    "google-genai>=2.34.0",
+    "pydantic-settings>=2.16.2",
+    "rapidfuzz>=3.14.6",
+    "requests>=2.34.2",
+    "tenacity>=9.1.4",
+]
+
+[project.scripts]
+anime-importer = "anime_importer.cli:main"
+anime-importer-web = "anime_importer.api.app:run"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]

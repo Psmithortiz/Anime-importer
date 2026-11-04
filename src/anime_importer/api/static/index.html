@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Anime Importer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <!-- 1. Start -->
+      <section id="screen-start" hidden>
+        <h1>Anime Importer</h1>
+        <p class="muted">Paste your anime list (one title per line) or load a .txt file.</p>
+        <textarea id="titles-input" rows="14" placeholder="Naruto&#10;Hellsing&#10;..."></textarea>
+        <div class="row">
+          <input id="file-input" type="file" accept=".txt,text/plain" />
+          <span id="line-count" class="muted">0 titles</span>
+        </div>
+        <p id="start-error" class="error" hidden></p>
+        <button id="start-btn" class="primary" type="button" disabled>Start import</button>
+      </section>
+
+      <!-- 2. Preparing -->
+      <section id="screen-preparing" hidden>
+        <h1>Anime Importer</h1>
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="normalizing-msg" class="center" data-label="Normalizing with Gemini…"></p>
+        <div class="progress-bar"><div id="normalizing-fill" class="progress-fill"></div></div>
+        <p id="resolving-msg" class="center" data-label="Looking up on MAL…"></p>
+        <div class="progress-bar"><div id="resolving-fill" class="progress-fill"></div></div>
+        <p id="poll-warning" class="warning center" hidden>
+          Can't reach the server. Retrying…
+        </p>
+      </section>
+
+      <!-- 3. Question -->
+      <section id="screen-question" hidden>
+        <div class="progress">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <span id="progress-text" class="muted"></span>
+        </div>
+        <h2 id="question-title"></h2>
+        <p class="muted">
+          <span id="question-query" hidden></span>
+          <span id="question-fallback" hidden>
+            (normalized title found nothing; searched your original line) ·
+          </span>
+          <a id="question-google" target="_blank" rel="noopener">Search on Google</a>
+        </p>
+        <div id="options"></div>
+        <div id="question-actions" class="actions">
+          <p id="question-help" class="muted small" hidden>
+            Click or 1-9 to select · Enter to confirm · X to discard
+          </p>
+          <p id="lookup-msg" class="muted small" hidden>Looking up the next titles on MAL…</p>
+          <p id="question-error" class="error" hidden></p>
+          <div class="row">
+            <button id="confirm-btn" class="primary" type="button" hidden disabled>
+              Confirm selection (Enter)
+            </button>
+            <button id="discard-btn" class="danger" type="button">Discard (X)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Finished -->
+      <section id="screen-finished" hidden>
+        <h1>Import finished</h1>
+        <p id="imported-count"></p>
+        <p id="rejected-count"></p>
+        <ul id="status-counts" class="status-counts"></ul>
+        <div id="rejected-table"></div>
+        <aside class="help-box">
+          To import: open
+          <a href="https://myanimelist.net/import.php" target="_blank" rel="noopener"
+            >MyAnimeList's import page</a
+          >, choose "MyAnimeList Import", select this file and check "Don't overwrite entries
+          already on my list" to keep your current list unchanged.
+        </aside>
+        <div class="row">
+          <a id="download-link" class="button primary" download="anime_import.xml">Download XML</a>
+          <button class="new-import" type="button">New import</button>
+        </div>
+      </section>
+
+      <!-- 5. Failed -->
+      <section id="screen-failed" hidden>
+        <h1>The import failed</h1>
+        <p id="failed-msg" class="error"></p>
+        <button class="new-import" type="button">New import</button>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

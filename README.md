@@ -1,168 +1,206 @@
 # Anime Importer
 
-A Python tool that normalizes a messy personal anime list (with typos, mixed Spanish/English/romaji, and personal notes)
-and imports it into [MyAnimeList](https://myanimelist.net/) via native XML.
+Turn a messy, hand-written anime list into a clean [MyAnimeList](https://myanimelist.net/) import file.
 
-Two interfaces are available: a **CLI** for batch processing in the terminal, and a **Flask web UI** for interactive
-resolution of ambiguous titles with poster previews.
+Gemini normalizes each line (typos, mixed Spanish/English/romaji, personal notes like `S2 ***` or
+`MANGA?`), the official MAL API finds the matching entries, and a small web UI with posters lets you
+resolve the ambiguous ones, pick several seasons at once and set a list status for each. The result is a
+native MAL XML file that you can import safely.
+
+![Choosing between candidates](docs/candidates.png)
 
 ## Why this exists
 
-I had ~300 anime titles in a Word document, written over years with inconsistent spelling, mixing languages, and
-personal annotations like `S1 S2`, `MANGA?`, or `Novela`. Manually re-entering them into MAL was not an option. Existing
-importers expected clean data; this tool handles the mess.
+Over the years I kept a list of the ~300 anime I had watched in a Word document, with inconsistent
+spelling, three languages and my own shorthand for seasons. Existing importers expected clean data.
+This tool handles the mess.
 
-## Stack
+The first version (May 2026) was a working script with a Flask UI. This version is a full rewrite with a
+layered architecture, tests and a proper API, built as a backend portfolio project.
 
-- **Python 3.13**
-- **Flask + Jinja2** — web UI
-- **Google Gemini 2.5 Flash** with Google Search grounding — title normalization
-- **[Jikan API](https://jikan.moe/)** — MyAnimeList search (unofficial mirror, better recall than MAL's official search
-  for modern anime)
-- **`thefuzz`** — fuzzy matching against search results
-- **`requests`, `python-dotenv`, `tqdm`**
+## Features
 
-## Setup
+- **LLM normalization** with Gemini 2.5 Flash and Google Search grounding, in chunks, with retries
+  tuned per error type (rate limit, overload, malformed output).
+- **Per-title normalization cache**: a failed or interrupted run never pays twice for titles it
+  already normalized, and editing the list only costs the new lines.
+- **Fuzzy matching** against each candidate's main and alternative titles (English, Japanese, synonyms).
+- **Web UI** with posters, media type, year, episode count and airing status
+  (*Airing*, *Not yet aired*).
+- **Multi-select** with a per-entry list status (*Completed*, *Watching*, *Plan to Watch*, …),
+  suggested from the airing status.
+- **Franchise discovery**: a breadth-first walk over MAL relations shows sequels, prequels, OVAs and
+  movies next to the candidates, so one line of the list can import a whole series.
+- **Look-ahead resolution**: a background worker resolves upcoming titles while you answer, after a
+  short initial buffer, so most questions appear instantly.
+- **Keyboard-first**: `1`–`9` to select, `Enter` to confirm, `X` to discard.
+- **REST API** documented automatically at `/docs`, plus an interactive CLI.
 
-```bash
-git clone https://github.com/Psmithortiz/Anime-importer
-cd Anime-importer
-python -m venv .venv
-.venv\Scripts\activate     # Windows
-pip install -r requirements.txt
-```
-
-Create a `.env` file in the project root with:
-
-```
-GEMINI_API_KEY=your_key_here
-MAL_CLIENT_ID=your_client_id_here
-```
-
-Place your anime list in `anime_list.txt`, one title per line. Notes like `MANGA?`, `S1 S2`, or `Novela` are ignored by
-the normalizer.
-
-## Usage
-
-### Web UI (recommended for interactive use)
-
-```bash
-python web.py
-```
-
-Open `http://127.0.0.1:5000` in your browser and click "EMPEZAR".
-
-The app will:
-
-1. Send your titles to Gemini in batches for romaji normalization
-2. Search each romaji in Jikan
-3. Show you menus only when the AI is uncertain (ambiguous titles) or the fuzzy match score is below threshold
-4. Let you discard titles that don't match anything
-5. Generate `output.xml` for upload to MAL and `errores.txt` for skipped titles
-
-### CLI
-
-```bash
-python main.py
-```
-
-Same pipeline, terminal-based menus. Faster if you trust the defaults, less informative for ambiguous cases.
-
-## Input format notes
-
-The normalizer treats each line in `anime_list.txt` as a single anime entry.
-Personal notes (`MANGA?`, `S1 S2`, `Novela`, etc.) are ignored during normalization.
-
-**Important:** if a line refers to multiple seasons of the same franchise
-(e.g., `Tate no Yuusha S1 S2 S3 S4`), only the main title will be normalized,
-and the result will map to a single MAL entry — not one per season. To import
-all seasons separately, either:
-
-- Split them into multiple lines in `anime_list.txt` before running the importer
-  (e.g., one line per season with its own season suffix), or
-- Add the missing seasons manually to MAL after the import.
-
-This is intentional: per-user notation for multi-season entries varies too much
-(`S1 S2`, `Season 1, 2, 3`, `Temporada 2`, asterisks, circles, etc.) to handle
-reliably in a single prompt, and keeping the normalizer focused on one job
-(spelling normalization) keeps it predictable.
-
+![Selecting seasons from the candidates and the franchise column](docs/multi-select.png)
+*Picking Season 2 and Part 2 from the candidates, and the Season 1 prequel from the franchise column.*
 ## How it works
 
 ```
 anime_list.txt
-    ↓
-Gemini batch normalization (chunks of 20, ~13s sleep between chunks)
-    ↓
-For each title:
-    ├─ ambiguous? → ask user (Gemini menu)
-    ↓
-    Jikan search by romaji
-    ├─ fuzzy match score >= 95? → auto-resolve
-    ├─ score < 95? → ask user (Jikan menu with poster preview)
-    └─ no results? → log to errores.txt
-    ↓
-Export to output.xml
+   │
+   ▼
+Gemini normalization ──── per-title cache (JSON on disk, versioned by model + prompt)
+   │   ambiguous? ──► ask: which title should I search for?
+   ▼
+MAL search (official API v2, throttled)
+   │
+   ▼
+Fuzzy match (main + alternative titles)
+   ├─ exactly one candidate ≥ 95 ──► accepted automatically, status suggested from airing status
+   └─ otherwise ──► ask: pick one or more candidates, each with a list status
+   ▼
+MAL XML export (import with "Don't overwrite entries already on my list")
 ```
 
-### Key design decisions
+## Architecture
 
-- **"Always-anime" prompt approach.** Every title in the input is something the user has personally watched, so the LLM
-  doesn't need to classify whether it's anime — it just normalizes spelling. This eliminated persistent false negatives
-  on post-cutoff titles.
-- **Jikan over MAL's official search API.** MAL v2 search has poor recall for modern anime (2024+). Jikan is a public
-  mirror that returns the same `mal_id` values, so the resulting XML imports cleanly.
-- **State in a global module dict for the web UI.** Single-user local app; sessions and databases would be overkill. The
-  state persists across HTTP requests via simple module-level scope.
-- **Helper functions modify state and return True/False.** Routes orchestrate; helpers don't know about Flask. Clear
-  separation between business logic and HTTP layer.
-- **Shared processing module.** The chunk loop and Gemini normalization logic live in `processing.py` and are reused by
-  both `main.py` and `web.py`, following the `(result, error)` tuple pattern from `retry.intentar()`.
+```
+src/anime_importer/
+├── domain/        Pure models and rules: dataclasses, enums, matching. No I/O, no frameworks.
+├── ports.py       Protocols the core depends on (AnimeSearcher, TitleNormalizer) and their errors.
+├── adapters/      The outside world: Gemini, MAL, the normalization cache, XML and text files.
+├── services/      ImportSession: the state machine that drives an import and pauses for questions.
+├── api/           FastAPI app, Pydantic schemas, in-memory session registry and the static frontend.
+├── cli.py         Interactive terminal interface over the same service.
+└── bootstrap.py   Composition root: the only place that wires concrete adapters together.
+```
 
-## Results
+Dependencies point inward: `api / cli → services → domain ← adapters`. The domain never imports an
+HTTP client, an SDK or a web framework, so it is tested without network access or API keys.
 
-The importer was run end-to-end on a real personal list of ~309 titles:
+## Design decisions
 
-![Import completed screen](docs/import-completed.jpg)
+**Ports and adapters, proven the hard way.** The first version searched through Jikan, an unofficial
+MAL mirror. In October 2026 Jikan's public API was discontinued. Because the service only depends on an
+`AnimeSearcher` protocol, switching to the official MAL API meant writing one adapter and changing one
+line in `bootstrap.py`. Each adapter also translates its own errors (`requests` exceptions become
+`SearchError`) and its own vocabulary (`"currently_airing"` becomes `AiringStatus.AIRING`), so the core
+never learns provider details.
 
-305 entries were imported successfully (98.7%). The 4 errors shown were
-manual discards in the Jikan menu — titles whose romaji didn't resolve
-cleanly and that I chose not to force into MAL.
+**A state machine instead of a global dict.** An import pauses for user input between HTTP requests.
+`ImportSession` models each pause as a typed step (`NormalizationChoice`, `CandidateChoice`,
+`Finished`), so an invalid combination (a normalization phase holding search results) cannot be built.
+Every mutating method validates first and changes state second: a bad selection never leaves the session
+half-updated.
 
-![MAL confirming the import](docs/mal-import-success.jpg)
+**Background normalization with polling.** Normalizing ~300 titles takes minutes, so
+`POST /api/sessions` returns `202 Accepted` immediately and the frontend polls the session. A lock
+serializes actions on a session (a double click can't advance it twice), but reads never take the lock,
+so polling stays responsive while normalization holds it. Endpoints are plain `def`: they call blocking
+code, which FastAPI runs in a thread pool instead of stalling the event loop.
 
-After the XML upload, MAL confirmed `Total Entries Updated: 305`.
+**Cache by title, not by chunk.** Gemini answers a whole chunk or nothing, but results are stored per
+title, keyed by the lightly normalized input line and versioned by a hash of the model and prompt.
+A callback persists each chunk as soon as it validates, with atomic writes, so a quota error in chunk 11
+keeps chunks 1–10. Inserting a title, reordering the list or changing the chunk size invalidates nothing.
 
-### Unexpected side benefit
+**Matching bugs found with real data.** Two examples:
+- The query sanitizer deleted punctuation, turning `Geiko-hen` into `Geikohen`. MAL's search requires
+  every word to match, so modern season titles returned nothing. Symbols now become spaces.
+- Fuzzy matching originally mapped results back by title text, so two entries with the same title
+  collapsed into one. Matching now keeps candidate identity, and a tie above the threshold is never
+  auto-accepted.
 
-While reviewing Gemini's ambiguous menus, I sometimes noticed seasons
-listed that I didn't know existed. Every time I checked, it turned out
-the second season had been recently announced or was already airing
-without my knowing. The normalizer effectively doubles as a passive
-"what's the latest on this franchise?" check, since Gemini's grounding
-pulls fresh info from Google Search on every batch.
+**Reading the import contract carefully.** I first assumed `update_on_import=0` meant "add only what's
+missing". The real import showed MAL *ignores* those entries; protecting an existing list is done with
+MAL's own "Don't overwrite entries already on my list" checkbox. The export now always sets `1` and the
+UI tells you which box to check.
 
-## Development mode
+**No frontend framework.** The UI is plain HTML, CSS and JavaScript served by FastAPI. All data from
+external APIs is inserted with `textContent`, never `innerHTML`, to rule out XSS from titles.
 
-For iterating on the web UI without burning Gemini quota, the app supports a local cache:
+## Setup
 
-- Set `DEV_MODE = True` at the top of `web.py`
-- The first successful Gemini run is saved to `gemini_cache.json`
-- Subsequent runs of `/empezar` read from cache instead of calling Gemini
+Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
-The cache file is in `.gitignore` and should not be committed.
+```bash
+git clone https://github.com/Psmithortiz/Anime-importer
+cd Anime-importer
+uv sync
+```
+
+Create a `.env` file in the project root:
+
+```
+GEMINI_API_KEY=your_gemini_key        # from Google AI Studio
+MAL_CLIENT_ID=your_mal_client_id      # from https://myanimelist.net/apiconfig
+```
+
+Optional settings: `GEMINI_MODEL`, `GEMINI_CHUNK_SIZE` (default 20) and `NORMALIZATION_CACHE_DIR`
+(default `.cache/normalization`).
+
+## Usage
+
+### Web UI
+
+```bash
+uv run anime-importer-web
+```
+
+Open <http://127.0.0.1:8000>, paste your list or load a `.txt` file (one title per line) and start.
+The API documentation is at <http://127.0.0.1:8000/docs>.
+
+Download the XML at the end and import it from
+[MAL's import page](https://myanimelist.net/import.php) (choose *MyAnimeList Import*). Check
+*Don't overwrite entries already on my list* to keep your current list unchanged.
+
+### CLI
+
+```bash
+uv run anime-importer --input anime_list.txt --output output.xml
+```
 
 ## Rate limits
 
-- **Gemini 2.5 Flash free tier**: 5 RPM, 20 RPD. Hence the 13s sleep between batches.
-- **Jikan**: ~3 req/sec, no documented daily cap.
+- **Gemini 2.5 Flash, free tier**: 5 requests per minute and 20 per day. A 317-title list takes 16
+  requests with the default chunk size. If the daily quota runs out, switch keys and restart: the cache
+  keeps everything already normalized.
+- **MAL API**: requests are throttled to one per second.
 
-If you have 300+ titles, expect the initial normalization phase to take ~3-5 minutes.
+## Testing
 
-## TODOs
+```bash
+uv run pytest
+uv run ruff check src tests
+```
 
-- [ ] Extract shared CSS into `static/styles.css`
-- [ ] Use Jinja2 template inheritance for a shared base layout
+The suite (220 tests) runs without network access, API keys or real waits: adapters accept injected
+sessions, clients, clocks and sleep functions.
+
+## Roadmap
+
+- Cut long MAL queries at a word boundary.
+- Fall back to the original line when the normalized title finds nothing on MAL.
+- Manual MAL search from the question screen.
+- Full pipeline: overlap Gemini normalization and MAL resolution.
+- Undo the last decision.
+
+## Results
+
+Run end to end on my real list of 317 hand-written lines:
+
+| | Version 1 (May 2026) | Version 2 |
+|---|---|---|
+| Lines resolved | 305 / 309 (98.7%) | 314 / 317 (99.1%) |
+| MAL entries exported | 305 | 434 (franchise discovery added ~120 seasons, movies and OVAs) |
+| Manual discards | 4 | 0 |
+
+![Import summary](docs/finished.png)
+
+Importing the file with *Don't overwrite entries already on my list* left the 349 entries I already
+had untouched and added 85 that were missing — mostly first seasons and side entries of franchises I
+had only partially logged by hand.
+
+![MAL import result](docs/mal-import-result.png)
+
+The 3 remaining lines each exposed a different issue, now on the roadmap: a query cut mid-word by the
+64-character limit, a normalization that was worse than the original line, and an abbreviation the LLM
+didn't recognize.
 
 ## License
 
