@@ -47,6 +47,8 @@ class ImportSession:
         searcher: AnimeSearcher,
     ) -> None:
         self._titles = list(titles)
+        if not self._titles:
+            raise ValueError("La lista de títulos está vacía")
         self._normalizer = normalizer
         self._searcher = searcher
         self._normalized: dict[int, NormalizedTitle] = {}
@@ -60,6 +62,11 @@ class ImportSession:
         if self._current is None:
             raise RuntimeError("La sesión no ha comenzado: llama a start()")
         return self._current
+
+    @property
+    def progress(self) -> tuple[int, int]:
+        """(títulos resueltos, total)."""
+        return self._position, len(self._titles)
 
     def start(self) -> Step:
         """Normaliza la lista completa y avanza hasta la primera pregunta.

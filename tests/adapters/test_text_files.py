@@ -1,4 +1,5 @@
 from anime_importer.adapters.text_files import (
+    parse_titles,
     read_titles,
     render_rejected_report,
     write_rejected_report,
@@ -36,3 +37,7 @@ def test_write_rejected_report(tmp_path):
     write_rejected_report(rejected, path)
 
     assert path.read_text(encoding="utf-8") == render_rejected_report(rejected)
+
+
+def test_parse_titles_strips_and_drops_blank_lines():
+    assert parse_titles("  a \n\n b\r\n") == ["a", "b"]

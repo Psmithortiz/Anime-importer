@@ -231,3 +231,27 @@ def test_start_twice_raises():
 
     with pytest.raises(RuntimeError):
         session.start()
+
+
+def test_empty_title_list_raises():
+    with pytest.raises(ValueError):
+        ImportSession([], FakeNormalizer([]), FakeSearcher({}))
+
+
+def test_progress_advances_with_resolved_titles():
+    session, _ = _session(
+        ["a", "b", "c"],
+        [NormalizedTitle(1, "A"), NormalizedTitle(2, "Hellsing"), NormalizedTitle(3, "C")],
+        {
+            "A": [AnimeCandidate(1, "A")],
+            "Hellsing": _hellsing_tie(),
+            "C": [AnimeCandidate(3, "C")],
+        },
+    )
+    assert session.progress == (0, 3)
+
+    assert isinstance(session.start(), CandidateChoice)
+    assert session.progress == (1, 3)
+
+    assert isinstance(session.choose(1), Finished)
+    assert session.progress == (3, 3)

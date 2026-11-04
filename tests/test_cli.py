@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from anime_importer.cli import ask_option, describe_question, run_interactive
+from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
 from anime_importer.services.import_session import CandidateChoice, Finished, ImportSession
@@ -75,3 +75,14 @@ def test_settings_defaults(monkeypatch, tmp_path):
     assert settings.input_path == Path("anime_list.txt")
     assert settings.output_xml_path == Path("output.xml")
     assert settings.rejected_report_path == Path("errores.txt")
+
+
+def test_main_empty_input_returns_1_without_writing_files(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("MAL_CLIENT_ID", "m")
+    empty = tmp_path / "vacio.txt"
+    empty.write_text("", encoding="utf-8")
+
+    assert main(["--input", str(empty)]) == 1
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["vacio.txt"]

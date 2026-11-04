@@ -4,9 +4,12 @@ from pathlib import Path
 from anime_importer.domain.models import RejectedTitle
 
 
+def parse_titles(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
 def read_titles(path: Path) -> list[str]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    return [line.strip() for line in lines if line.strip()]
+    return parse_titles(path.read_text(encoding="utf-8"))
 
 
 def render_rejected_report(rejected: Sequence[RejectedTitle]) -> str:

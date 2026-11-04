@@ -85,7 +85,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     rejected_path = args.rejected or settings.rejected_report_path
 
     titles = read_titles(input_path)
-    session = build_session(settings, titles)
+    try:
+        session = build_session(settings, titles)
+    except ValueError as exc:
+        logger.error("%s: %s", input_path, exc)
+        return 1
     try:
         finished = run_interactive(session)
     except NormalizationError as exc:
