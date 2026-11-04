@@ -25,6 +25,8 @@ layered architecture, tests and a proper API, built as a backend portfolio proje
 - **Per-title normalization cache**: a failed or interrupted run never pays twice for titles it
   already normalized, and editing the list only costs the new lines.
 - **Fuzzy matching** against each candidate's main and alternative titles (English, Japanese, synonyms).
+- **Fallback to your own line**: when the normalized title finds nothing on MAL, the original line is
+  searched instead, and it is always offered as an option when the normalizer is unsure.
 - **Web UI** with posters, media type, year, episode count and airing status
   (*Airing*, *Not yet aired*).
 - **Multi-select** with a per-entry list status (*Completed*, *Watching*, *Plan to Watch*, …),
@@ -88,11 +90,30 @@ never learns provider details.
 Every mutating method validates first and changes state second: a bad selection never leaves the session
 half-updated.
 
-**Background normalization with polling.** Normalizing ~300 titles takes minutes, so
-`POST /api/sessions` returns `202 Accepted` immediately and the frontend polls the session. A lock
+**Background work with polling.** Preparing an import takes minutes, so `POST /api/sessions` returns
+`202 Accepted` immediately and the frontend polls the session, showing progress for both phases. A lock
 serializes actions on a session (a double click can't advance it twice), but reads never take the lock,
-so polling stays responsive while normalization holds it. Endpoints are plain `def`: they call blocking
-code, which FastAPI runs in a thread pool instead of stalling the event loop.
+so polling stays responsive. Endpoints are plain `def`: they call blocking code, which FastAPI runs in a
+thread pool instead of stalling the event loop.
+
+**Franchise discovery as a breadth-first search.** MAL only exposes `related_anime` on each anime's
+detail endpoint, so the franchise is a graph explored one request per node. Relations are mutual
+(S1 → S2 is a *sequel*, S2 → S1 a *prequel*), so nodes are marked visited when they are **enqueued**, not
+when they are processed — otherwise two seasons pointing at the same OVA would queue it twice. Only
+in-continuity relations are expanded (sequel, prequel, side story, summary and their inverses);
+spin-offs and alternative versions are shown but not followed, and character crossovers are ignored, so
+a walk from *Re:Zero* never wanders into *Overlord*. A node cap bounds huge franchises, and details are
+cached per MAL id for seven days. If the matched title has a franchise, the question is shown even when
+the match itself was certain: that is how forgotten first seasons and announced sequels surface.
+
+**Look-ahead resolution, like a video buffer.** Each title needs a search plus a franchise walk, which
+at one request per second is too slow to do after every answer. A background worker resolves titles in
+order and appends each *resolution* (import, reject or ask) to a list; answering a question only
+*applies* the next resolution. The first question appears once an initial buffer is ready, and the
+worker keeps going while you answer, so most questions show up instantly. The worker and the request
+threads coordinate through a `threading.Condition` (no polling loops), never hold a lock during network
+I/O, and share a single thread-safe throttle so MAL's rate limit holds across both. In tests, the
+background runner is injected and runs synchronously, which keeps the suite deterministic.
 
 **Cache by title, not by chunk.** Gemini answers a whole chunk or nothing, but results are stored per
 title, keyed by the lightly normalized input line and versioned by a hash of the model and prompt.
@@ -169,14 +190,11 @@ uv run pytest
 uv run ruff check src tests
 ```
 
-The suite (220 tests) runs without network access, API keys or real waits: adapters accept injected
+The suite (238 tests) runs without network access, API keys or real waits: adapters accept injected
 sessions, clients, clocks and sleep functions.
 
 ## Roadmap
 
-- Cut long MAL queries at a word boundary.
-- Fall back to the original line when the normalized title finds nothing on MAL.
-- Manual MAL search from the question screen.
 - Full pipeline: overlap Gemini normalization and MAL resolution.
 - Undo the last decision.
 
@@ -198,9 +216,10 @@ had only partially logged by hand.
 
 ![MAL import result](docs/mal-import-result.png)
 
-The 3 remaining lines each exposed a different issue, now on the roadmap: a query cut mid-word by the
-64-character limit, a normalization that was worse than the original line, and an abbreviation the LLM
-didn't recognize.
+The 3 remaining lines each exposed a different issue: a query cut mid-word by the 64-character limit, a
+normalization that was worse than the original line (the LLM "corrected" `Mob wo` to `Mobu o`, and
+expanded an anime title to its manga's full name), and an abbreviation the LLM didn't recognize. Cutting
+at word boundaries and falling back to the original line now resolve all three.
 
 ## License
 
