@@ -145,7 +145,8 @@ uv run anime-importer-web
 Open <http://127.0.0.1:8000>, paste your list or load a `.txt` file (one title per line) and start.
 The API documentation is at <http://127.0.0.1:8000/docs>.
 
-Download the XML at the end and import it from MAL (*Import → MyAnimeList Import*). Check
+Download the XML at the end and import it from
+[MAL's import page](https://myanimelist.net/import.php) (choose *MyAnimeList Import*). Check
 *Don't overwrite entries already on my list* to keep your current list unchanged.
 
 ### CLI
