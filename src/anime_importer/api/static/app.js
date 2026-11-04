@@ -148,7 +148,10 @@ function renderQuestion(view) {
   $("question-error").hidden = true;
   const isCandidate = question.kind === "candidate";
   $("confirm-btn").hidden = !isCandidate;
-  $("question-help").hidden = !isCandidate;
+  $("question-help").textContent = isCandidate
+    ? "Click or 1-9 to select · Enter to confirm · X to discard"
+    : "Click or 1-9 to choose · X to discard";
+  $("question-help").hidden = false;
   updateConfirm();
 
   const percent = progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
