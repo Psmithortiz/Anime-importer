@@ -47,6 +47,23 @@ def test_sanitize_query_strips_special_chars_and_whitespace():
     assert sanitize_query("Re: Zero ") == "Re Zero"
 
 
+def test_sanitize_query_replaces_symbols_with_spaces():
+    assert (
+        sanitize_query("Kimetsu no Yaiba: Hashira Geiko-hen")
+        == "Kimetsu no Yaiba Hashira Geiko hen"
+    )
+    assert (
+        sanitize_query("Shingeki no Kyojin: The Final Season - Kanketsu-hen")
+        == "Shingeki no Kyojin The Final Season Kanketsu hen"
+    )
+
+
+def test_sanitize_query_truncates_without_trailing_space():
+    result = sanitize_query("abcdefg " * 10)
+    assert len(result) <= 64
+    assert not result.endswith(" ")
+
+
 class _RecordingSession:
     def __init__(self) -> None:
         self.headers: dict[str, str] = {}

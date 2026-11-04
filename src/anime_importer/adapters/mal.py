@@ -14,7 +14,9 @@ _UNSAFE_CHARS = re.compile(r"[^a-zA-Z0-9 ]")
 
 
 def sanitize_query(query: str) -> str:
-    return _UNSAFE_CHARS.sub("", query)[:_MAX_QUERY_LENGTH].strip()
+    spaced = _UNSAFE_CHARS.sub(" ", query)
+    collapsed = " ".join(spaced.split())
+    return collapsed[:_MAX_QUERY_LENGTH].strip()
 
 
 def parse_search_response(data: dict) -> list[AnimeCandidate]:
