@@ -15,6 +15,8 @@ let pollTimer = null;
 let busy = false;
 // Multi-selection of the current question: MAL id -> list status.
 const selection = new Map();
+// Single selection of a normalization question: option number, or null.
+let normalizationChoice = null;
 
 // ---------------------------------------------------------------- API
 
@@ -144,13 +146,12 @@ function renderPreparing(view) {
 function renderQuestion(view) {
   const { question, progress } = view;
   selection.clear();
+  normalizationChoice = null;
   setBusy(false);
   $("question-error").hidden = true;
   const isCandidate = question.kind === "candidate";
-  $("confirm-btn").hidden = !isCandidate;
-  $("question-help").textContent = isCandidate
-    ? "Click or 1-9 to select · Enter to confirm · X to discard"
-    : "Click or 1-9 to choose · X to discard";
+  $("confirm-btn").hidden = false;
+  $("question-help").textContent = "Click or 1-9 to select · Enter to confirm · X to discard";
   $("question-help").hidden = false;
   updateConfirm();
 
@@ -174,18 +175,6 @@ function renderQuestion(view) {
     isCandidate ? buildCandidateLayout(question) : buildOptionList(question.options),
   );
   showScreen("question");
-}
-
-function makeActivatable(node, handler) {
-  node.setAttribute("role", "button");
-  node.setAttribute("tabindex", "0");
-  node.addEventListener("click", handler);
-  node.addEventListener("keydown", (event) => {
-    if (event.target === node && (event.key === "Enter" || event.key === " ")) {
-      event.preventDefault();
-      handler();
-    }
-  });
 }
 
 function buildPoster(option) {
@@ -270,12 +259,26 @@ function toggleSelection(item) {
   setSelected(item, !selection.has(item.mal_id));
 }
 
+// Single selection in a normalization question: marking another option unmarks the previous one.
+function toggleNormalization(option) {
+  if (busy) return;
+  normalizationChoice = normalizationChoice === option.number ? null : option.number;
+  for (const row of document.querySelectorAll("#options .option-row")) {
+    const on = Number(row.dataset.number) === normalizationChoice;
+    row.classList.toggle("selected", on);
+    row.setAttribute("aria-pressed", String(on));
+  }
+  updateConfirm();
+}
+
 function updateConfirm() {
   const button = $("confirm-btn");
-  button.textContent = selection.size > 0
-    ? `Confirm selection (${selection.size}) (Enter)`
+  const isNormalization = currentView?.question?.kind === "normalization";
+  const count = isNormalization ? (normalizationChoice === null ? 0 : 1) : selection.size;
+  button.textContent = !isNormalization && count > 0
+    ? `Confirm selection (${count}) (Enter)`
     : "Confirm selection (Enter)";
-  button.disabled = busy || selection.size === 0;
+  button.disabled = busy || count === 0;
 }
 
 function makeSelectableCard(card, item) {
@@ -386,7 +389,17 @@ function buildOptionList(options) {
       el("span", { text, className: "label" }),
       externalLink("Search on Google", googleUrl(option.label)),
     ]);
-    makeActivatable(row, () => submit(() => choose(option.number)));
+    row.dataset.number = String(option.number);
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-pressed", "false");
+    row.addEventListener("click", () => toggleNormalization(option));
+    row.addEventListener("keydown", (event) => {
+      if (event.target === row && event.key === " ") {
+        event.preventDefault();
+        toggleNormalization(option);
+      }
+    });
     list.append(row);
   }
   return list;
@@ -467,6 +480,12 @@ function chooseMany() {
 }
 
 function confirmSelection() {
+  if (currentView?.question?.kind === "normalization") {
+    if (normalizationChoice === null) return;
+    const number = normalizationChoice;
+    submit(() => choose(number));
+    return;
+  }
   if (selection.size === 0) return;
   submit(chooseMany);
 }
@@ -524,7 +543,7 @@ function onKeydown(event) {
     return;
   }
   const { question } = currentView;
-  if (event.key === "Enter" && question.kind === "candidate") {
+  if (event.key === "Enter") {
     // If focus is on a button or link, Enter keeps its native action.
     if (target instanceof HTMLElement && target.matches("button, a")) return;
     event.preventDefault();
@@ -537,7 +556,7 @@ function onKeydown(event) {
     if (!option) return;
     event.preventDefault();
     if (question.kind === "candidate") toggleSelection(option);
-    else submit(() => choose(number));
+    else toggleNormalization(option);
   }
 }
 
