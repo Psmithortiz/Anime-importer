@@ -6,6 +6,7 @@ from anime_importer.domain.models import (
     AiringStatus,
     ListStatus,
     MediaType,
+    RelationType,
     suggest_list_status,
 )
 from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
@@ -22,7 +23,7 @@ class ChooseRequest(BaseModel):
 
 
 class SelectionIn(BaseModel):
-    option: int = Field(ge=1)
+    mal_id: int = Field(ge=1)
     status: ListStatus
 
 
@@ -42,11 +43,26 @@ class OptionOut(BaseModel):
     suggested_status: ListStatus | None = None
 
 
+class FranchiseOptionOut(BaseModel):
+    mal_id: int
+    label: str
+    image_url: str | None = None
+    media_type: MediaType | None = None
+    year: int | None = None
+    episodes: int | None = None
+    airing_status: AiringStatus
+    suggested_status: ListStatus
+    relation: RelationType
+
+
 class QuestionOut(BaseModel):
     kind: Literal["normalization", "candidate"]
     original_title: str
     query: str | None = None
     options: list[OptionOut]
+    franchise: list[FranchiseOptionOut] = []
+    franchise_truncated: bool = False
+    preselected: list[int] = []
 
 
 class ProgressOut(BaseModel):
@@ -103,4 +119,20 @@ def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
             )
             for number, candidate in enumerate(step.options, start=1)
         ],
+        franchise=[
+            FranchiseOptionOut(
+                mal_id=entry.candidate.mal_id,
+                label=entry.candidate.title,
+                image_url=entry.candidate.image_url,
+                media_type=entry.candidate.media_type,
+                year=entry.candidate.year,
+                episodes=entry.candidate.episodes,
+                airing_status=entry.candidate.airing_status,
+                suggested_status=suggest_list_status(entry.candidate.airing_status),
+                relation=entry.relation,
+            )
+            for entry in step.franchise.entries
+        ],
+        franchise_truncated=step.franchise.truncated,
+        preselected=sorted(step.preselected),
     )

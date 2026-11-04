@@ -288,7 +288,7 @@ def test_choose_many_imports_each_option_with_its_status():
     session, _ = _tie_session()
     session.start()
 
-    step = session.choose_many([(1, ListStatus.DROPPED), (2, ListStatus.WATCHING)])
+    step = session.choose_many([(10, ListStatus.DROPPED), (20, ListStatus.WATCHING)])
 
     assert isinstance(step, Finished)
     assert step.imported == (
@@ -301,9 +301,9 @@ def test_choose_many_imports_each_option_with_its_status():
     "selections",
     [
         [],
-        [(3, ListStatus.COMPLETED)],
+        [(30, ListStatus.COMPLETED)],
         [(0, ListStatus.COMPLETED)],
-        [(1, ListStatus.COMPLETED), (1, ListStatus.DROPPED)],
+        [(10, ListStatus.COMPLETED), (10, ListStatus.DROPPED)],
     ],
 )
 def test_choose_many_invalid_raises_and_keeps_question(selections):
@@ -326,7 +326,7 @@ def test_choose_many_on_normalization_choice_raises():
     step = session.start()
 
     with pytest.raises(ValueError):
-        session.choose_many([(1, ListStatus.COMPLETED)])
+        session.choose_many([(10, ListStatus.COMPLETED)])
 
     assert session.current is step
 
@@ -363,7 +363,7 @@ def test_duplicate_mal_id_last_import_wins():
     )
     session.start()
 
-    step = session.choose_many([(2, ListStatus.DROPPED)])
+    step = session.choose_many([(20, ListStatus.DROPPED)])
 
     assert isinstance(step, Finished)
     assert step.imported == (ImportedAnime(20, "Hellsing", ListStatus.DROPPED),)

@@ -192,8 +192,8 @@ def test_choose_many_flow_and_by_status():
         f"/api/sessions/{session_id}/choose-many",
         json={
             "selections": [
-                {"option": 1, "status": "watching"},
-                {"option": 2, "status": "dropped"},
+                {"mal_id": 10, "status": "watching"},
+                {"mal_id": 20, "status": "dropped"},
             ]
         },
     ).json()
@@ -229,7 +229,7 @@ def test_choose_many_invalid_status_is_422():
 
     response = client.post(
         f"/api/sessions/{session_id}/choose-many",
-        json={"selections": [{"option": 1, "status": "nope"}]},
+        json={"selections": [{"mal_id": 10, "status": "nope"}]},
     )
 
     assert response.status_code == 422
@@ -241,7 +241,7 @@ def test_choose_many_out_of_range_is_422_and_keeps_question():
 
     response = client.post(
         f"/api/sessions/{session_id}/choose-many",
-        json={"selections": [{"option": 9, "status": "completed"}]},
+        json={"selections": [{"mal_id": 999, "status": "completed"}]},
     )
 
     assert response.status_code == 422
@@ -255,7 +255,7 @@ def test_choose_many_after_finished_is_409():
 
     response = client.post(
         f"/api/sessions/{session_id}/choose-many",
-        json={"selections": [{"option": 1, "status": "completed"}]},
+        json={"selections": [{"mal_id": 10, "status": "completed"}]},
     )
 
     assert response.status_code == 409

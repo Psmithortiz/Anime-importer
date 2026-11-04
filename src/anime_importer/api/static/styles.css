@@ -355,3 +355,49 @@ th {
   color: var(--muted);
   font-weight: 600;
 }
+
+/* Candidates + franchise layout */
+.question-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.candidates {
+  min-width: 0;
+}
+
+.franchise h3 {
+  margin: 1rem 0 0;
+}
+
+.franchise-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.card-compact {
+  padding: 0.375rem;
+  font-size: 0.85rem;
+}
+
+.card-compact .card-label {
+  font-size: 0.85rem;
+}
+
+.relation-tag {
+  align-self: flex-start;
+  padding: 0 0.375rem;
+  background: var(--border);
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+@media (min-width: 900px) {
+  .question-layout.has-franchise {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}

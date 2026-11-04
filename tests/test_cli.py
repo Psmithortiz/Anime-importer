@@ -107,7 +107,9 @@ def test_main_overwrite_flag_reaches_xml(monkeypatch, tmp_path, flags, expected)
     monkeypatch.setenv("MAL_CLIENT_ID", "m")
     monkeypatch.setattr(
         "anime_importer.cli.build_session",
-        lambda settings, titles: ImportSession(titles, _AutoNormalizer(), _AutoSearcher()),
+        lambda settings, titles, with_franchise=True: ImportSession(
+            titles, _AutoNormalizer(), _AutoSearcher()
+        ),
     )
     titles = tmp_path / "list.txt"
     titles.write_text("naruto\n", encoding="utf-8")

@@ -60,7 +60,10 @@ def _from_dict(data: dict[str, Any]) -> AnimeDetails:
 
 
 class CachingDetailsProvider:
-    """Cache anime details in a JSON file {mal_id: {fetched_at, details}} with a TTL."""
+    """Cache anime details in a JSON file {mal_id: {fetched_at, details}} with a TTL.
+
+    The file is loaded once (lazily) into memory; every miss updates the dict and rewrites the file.
+    """
 
     def __init__(
         self,
@@ -74,10 +77,12 @@ class CachingDetailsProvider:
         self._ttl_seconds = ttl_seconds
         self._clock = clock
         self._lock = threading.Lock()
+        self._entries: dict[str, Any] | None = None
 
     def get_details(self, mal_id: int) -> AnimeDetails:
+        key = str(mal_id)
         with self._lock:
-            entry = self._read().get(str(mal_id))
+            entry = self._load().get(key)
         if entry is not None:
             try:
                 if self._clock() - entry["fetched_at"] < self._ttl_seconds:
@@ -87,10 +92,16 @@ class CachingDetailsProvider:
 
         details = self._inner.get_details(mal_id)
         with self._lock:
-            entries = self._read()
-            entries[str(mal_id)] = {"fetched_at": self._clock(), "details": _to_dict(details)}
+            entries = self._load()
+            entries[key] = {"fetched_at": self._clock(), "details": _to_dict(details)}
             write_json_atomic(self._path, entries)
         return details
+
+    def _load(self) -> dict[str, Any]:
+        """Return the in-memory dict, reading the file the first time. Call with the lock held."""
+        if self._entries is None:
+            self._entries = self._read()
+        return self._entries
 
     def _read(self) -> dict[str, Any]:
         try:

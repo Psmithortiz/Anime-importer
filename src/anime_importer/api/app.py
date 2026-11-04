@@ -128,7 +128,7 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
     )
     def choose_many(body: ChooseManyRequest, managed: ManagedDep) -> SessionView:
         try:
-            managed.choose_many([(item.option, item.status) for item in body.selections])
+            managed.choose_many([(item.mal_id, item.status) for item in body.selections])
         except InvalidStateError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from None
         except ValueError as exc:

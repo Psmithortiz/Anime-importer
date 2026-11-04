@@ -114,3 +114,32 @@ def test_default_clock_is_wall_time():
     import time
 
     assert provider._clock is time.time
+
+
+def test_file_is_read_only_once(tmp_path):
+    provider, inner, path = _provider(tmp_path, Clock())
+
+    provider.get_details(2)  # miss: loads the (missing) file, then writes it
+    path.unlink()
+    again = provider.get_details(2)  # hit served from memory, not from disk
+
+    assert again == DETAILS
+    assert inner.calls == [2]
+    assert not path.exists()
+
+
+def test_existing_file_is_loaded_lazily_once(tmp_path, monkeypatch):
+    clock = Clock()
+    provider, _, path = _provider(tmp_path, clock)
+    provider.get_details(2)
+    fresh = CachingDetailsProvider(FakeInner(), path, ttl_seconds=100, clock=clock)
+    reads = []
+    original = type(path).read_text
+    monkeypatch.setattr(
+        type(path), "read_text", lambda self, *a, **k: reads.append(self) or original(self, *a, **k)
+    )
+
+    fresh.get_details(2)
+    fresh.get_details(2)
+
+    assert len(reads) == 1

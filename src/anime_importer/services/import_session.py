@@ -1,9 +1,10 @@
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 
 from anime_importer.domain.matching import match_candidates
 from anime_importer.domain.models import (
     AnimeCandidate,
+    Franchise,
     ImportedAnime,
     ListStatus,
     NormalizedTitle,
@@ -28,6 +29,8 @@ class CandidateChoice:
     original_title: str
     query: str
     options: tuple[AnimeCandidate, ...]
+    franchise: Franchise = field(default_factory=Franchise)
+    preselected: frozenset[int] = frozenset()  # mal_ids marked in advance
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +40,8 @@ class Finished:
 
 
 Step = NormalizationChoice | CandidateChoice | Finished
+
+FranchiseFinder = Callable[[Sequence[int]], Franchise]
 
 
 def _imported_from(candidate: AnimeCandidate) -> ImportedAnime:
@@ -55,12 +60,14 @@ class ImportSession:
         titles: Sequence[str],
         normalizer: TitleNormalizer,
         searcher: AnimeSearcher,
+        franchise_finder: FranchiseFinder | None = None,
     ) -> None:
         self._titles = list(titles)
         if not self._titles:
             raise ValueError("The title list is empty")
         self._normalizer = normalizer
         self._searcher = searcher
+        self._franchise_finder = franchise_finder
         self._normalized: dict[int, NormalizedTitle] = {}
         self._position = 0
         self._imported: list[ImportedAnime] = []
@@ -117,23 +124,27 @@ class ImportSession:
         return self._advance()
 
     def choose_many(self, selections: Sequence[tuple[int, ListStatus]]) -> Step:
-        """Import several options of the current question, each with its list status.
+        """Import several anime of the current question, each with its list status.
 
-        Only valid for CandidateChoice. On a ValueError the session does not change.
+        Selections are (mal_id, status) pairs; a mal_id may belong to the options or to the
+        franchise. Only valid for CandidateChoice. On a ValueError the session does not change.
         """
         step = self._pending_question()
         if not isinstance(step, CandidateChoice):
             raise ValueError("choose_many only applies to candidate questions")  # noqa: TRY004
         if not selections:
             raise ValueError("You must choose at least one option")
-        numbers = [number for number, _ in selections]
-        if len(set(numbers)) != len(numbers):
-            raise ValueError("Repeated options")
-        for number in numbers:
-            if not 1 <= number <= len(step.options):
-                raise ValueError(f"Option out of range: {number}")
-        for number, status in selections:
-            chosen = step.options[number - 1]
+        available = {candidate.mal_id: candidate for candidate in step.options}
+        for entry in step.franchise.entries:
+            available.setdefault(entry.candidate.mal_id, entry.candidate)
+        ids = [mal_id for mal_id, _ in selections]
+        if len(set(ids)) != len(ids):
+            raise ValueError("Repeated selections")
+        for mal_id in ids:
+            if mal_id not in available:
+                raise ValueError(f"Unknown MAL id for this question: {mal_id}")
+        for mal_id, status in selections:
+            chosen = available[mal_id]
             self._imported.append(
                 ImportedAnime(mal_id=chosen.mal_id, title=chosen.title, list_status=status)
             )
@@ -196,10 +207,26 @@ class ImportSession:
             self._reject(original, f"No results (query: {query})")
             return None
         result = match_candidates(query, candidates)
+        finder = self._franchise_finder
         if result.accepted is not None:
-            self._imported.append(_imported_from(result.accepted))
-            return None
-        return CandidateChoice(original_title=original, query=query, options=result.options)
+            accepted = result.accepted
+            franchise = finder([accepted.mal_id]) if finder is not None else Franchise()
+            if not franchise.entries and not franchise.truncated:
+                self._imported.append(_imported_from(accepted))
+                return None
+            return CandidateChoice(
+                original_title=original,
+                query=query,
+                options=(accepted,),
+                franchise=franchise,
+                preselected=frozenset({accepted.mal_id}),
+            )
+        franchise = (
+            finder([c.mal_id for c in result.options]) if finder is not None else Franchise()
+        )
+        return CandidateChoice(
+            original_title=original, query=query, options=result.options, franchise=franchise
+        )
 
     def _reject(self, original: str, reason: str) -> None:
         self._rejected.append(RejectedTitle(original_title=original, reason=reason))

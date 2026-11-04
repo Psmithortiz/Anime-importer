@@ -13,7 +13,7 @@ let sessionId = null;
 let currentView = null;
 let pollTimer = null;
 let busy = false;
-// Multi-selection of the current question: option number -> list status.
+// Multi-selection of the current question: MAL id -> list status.
 const selection = new Map();
 
 // ---------------------------------------------------------------- API
@@ -169,8 +169,14 @@ function renderQuestion(view) {
 
   const container = $("options");
   container.replaceChildren(
-    isCandidate ? buildCards(question.options) : buildOptionList(question.options),
+    isCandidate ? buildCandidateLayout(question) : buildOptionList(question.options),
   );
+  if (isCandidate) {
+    const preselected = new Set(question.preselected || []);
+    for (const item of [...question.options, ...(question.franchise || [])]) {
+      if (preselected.has(item.mal_id)) setSelected(item, true);
+    }
+  }
   showScreen("question");
 }
 
@@ -240,28 +246,31 @@ function buildStatusSelect(option) {
   for (const type of ["click", "keydown"]) {
     select.addEventListener(type, (event) => event.stopPropagation());
   }
-  select.addEventListener("change", () => selection.set(option.number, select.value));
+  select.addEventListener("change", () => selection.set(option.mal_id, select.value));
   return select;
 }
 
-function toggleSelection(option) {
-  if (busy) return;
-  const card = document.querySelector(`.card[data-number="${option.number}"]`);
+// Mark or unmark an item (candidate or franchise entry) by its MAL id.
+function setSelected(item, on) {
+  const card = document.querySelector(`.card[data-mal-id="${item.mal_id}"]`);
   if (!card) return;
   const select = card.querySelector("select");
-  if (selection.has(option.number)) {
-    selection.delete(option.number);
-    card.classList.remove("selected");
-    select.hidden = true;
-  } else {
-    const status = option.suggested_status || "completed";
-    selection.set(option.number, status);
+  if (on) {
+    const status = item.suggested_status || "completed";
+    selection.set(item.mal_id, status);
     select.value = status;
-    card.classList.add("selected");
-    select.hidden = false;
+  } else {
+    selection.delete(item.mal_id);
   }
-  card.setAttribute("aria-pressed", String(selection.has(option.number)));
+  card.classList.toggle("selected", on);
+  select.hidden = !on;
+  card.setAttribute("aria-pressed", String(on));
   updateConfirm();
+}
+
+function toggleSelection(item) {
+  if (busy) return;
+  setSelected(item, !selection.has(item.mal_id));
 }
 
 function updateConfirm() {
@@ -272,33 +281,101 @@ function updateConfirm() {
   button.disabled = busy || selection.size === 0;
 }
 
+function makeSelectableCard(card, item) {
+  card.setAttribute("role", "button");
+  card.setAttribute("tabindex", "0");
+  card.setAttribute("aria-pressed", "false");
+  card.addEventListener("click", () => toggleSelection(item));
+  card.addEventListener("keydown", (event) => {
+    if (event.target === card && event.key === " ") {
+      event.preventDefault();
+      toggleSelection(item);
+    }
+  });
+}
+
+function malLink(item) {
+  return externalLink("View on MAL", `https://myanimelist.net/anime/${encodeURIComponent(item.mal_id)}`);
+}
+
 function buildCards(options) {
   const grid = el("div", { className: "cards" });
   for (const option of options) {
     const select = buildStatusSelect(option);
     select.hidden = true;
-    const card = el("div", { className: "card", attrs: { "data-number": String(option.number) } }, [
+    const card = el("div", { className: "card", attrs: { "data-mal-id": String(option.mal_id) } }, [
       buildPoster(option),
       el("span", { text: String(option.number), className: "badge" }),
       el("div", { text: option.label, className: "card-label" }),
       buildMetaLine(option),
       el("div", { text: `MAL id ${option.mal_id}`, className: "card-meta" }),
-      externalLink("View on MAL", `https://myanimelist.net/anime/${encodeURIComponent(option.mal_id)}`),
+      malLink(option),
       select,
     ]);
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-pressed", "false");
-    card.addEventListener("click", () => toggleSelection(option));
-    card.addEventListener("keydown", (event) => {
-      if (event.target === card && event.key === " ") {
-        event.preventDefault();
-        toggleSelection(option);
-      }
-    });
+    makeSelectableCard(card, option);
     grid.append(card);
   }
   return grid;
+}
+
+const RELATION_LABELS = {
+  sequel: "Sequel",
+  prequel: "Prequel",
+  side_story: "Side story",
+  parent_story: "Parent story",
+  summary: "Summary",
+  full_story: "Full story",
+  alternative_version: "Alt. version",
+  alternative_setting: "Alt. setting",
+  spin_off: "Spin-off",
+};
+
+function buildFranchiseCard(entry) {
+  const select = buildStatusSelect(entry);
+  select.hidden = true;
+  const card = el(
+    "div",
+    { className: "card card-compact", attrs: { "data-mal-id": String(entry.mal_id) } },
+    [
+      buildPoster(entry),
+      el("span", { text: RELATION_LABELS[entry.relation] || entry.relation, className: "relation-tag" }),
+      el("div", { text: entry.label, className: "card-label" }),
+      buildMetaLine(entry),
+      malLink(entry),
+      select,
+    ],
+  );
+  makeSelectableCard(card, entry);
+  return card;
+}
+
+function buildFranchiseColumn(question) {
+  const entries = question.franchise;
+  const grid = el("div", { className: "franchise-grid" }, entries.map(buildFranchiseCard));
+  const column = el("aside", { className: "franchise" }, [
+    el("h3", { text: `Franchise (${entries.length})` }),
+    grid,
+  ]);
+  if (question.franchise_truncated) {
+    column.append(
+      el("p", {
+        text: "Large franchise: showing the first related entries only.",
+        className: "muted small",
+      }),
+    );
+  }
+  return column;
+}
+
+function buildCandidateLayout(question) {
+  const layout = el("div", { className: "question-layout" }, [
+    el("div", { className: "candidates" }, [buildCards(question.options)]),
+  ]);
+  if ((question.franchise || []).length > 0) {
+    layout.classList.add("has-franchise");
+    layout.append(buildFranchiseColumn(question));
+  }
+  return layout;
 }
 
 function buildOptionList(options) {
@@ -361,6 +438,7 @@ function setBusy(flag) {
   busy = flag;
   $("screen-question").classList.toggle("busy", flag);
   $("discard-btn").disabled = flag;
+  $("lookup-msg").hidden = !flag;
   for (const select of document.querySelectorAll("#options select")) select.disabled = flag;
   updateConfirm();
 }
@@ -387,7 +465,7 @@ function choose(number) {
 function chooseMany() {
   const selections = [...selection.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([option, status]) => ({ option, status }));
+    .map(([malId, status]) => ({ mal_id: malId, status }));
   return api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/choose-many`, { selections });
 }
 
