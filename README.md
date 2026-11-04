@@ -36,8 +36,8 @@ layered architecture, tests and a proper API, built as a backend portfolio proje
 - **Keyboard-first**: `1`–`9` to select, `Enter` to confirm, `X` to discard.
 - **REST API** documented automatically at `/docs`, plus an interactive CLI.
 
-![Selecting several seasons with different statuses](docs/multi-select.png)
-
+![Selecting seasons from the candidates and the franchise column](docs/multi-select.png)
+*Picking Season 2 and Part 2 from the candidates, and the Season 1 prequel from the franchise column.*
 ## How it works
 
 ```
