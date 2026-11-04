@@ -1,6 +1,12 @@
 import pytest
 
-from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
+from anime_importer.domain.models import (
+    AiringStatus,
+    AnimeCandidate,
+    ImportedAnime,
+    ListStatus,
+    NormalizedTitle,
+)
 from anime_importer.ports import SearchError
 from anime_importer.services.import_session import (
     CandidateChoice,
@@ -255,3 +261,92 @@ def test_progress_advances_with_resolved_titles():
 
     assert isinstance(session.choose(1), Finished)
     assert session.progress == (3, 3)
+
+
+def _tie_session():
+    return _session(["hellsing"], [NormalizedTitle(1, "Hellsing")], {"Hellsing": _hellsing_tie()})
+
+
+def test_choose_many_imports_each_option_with_its_status():
+    session, _ = _tie_session()
+    session.start()
+
+    step = session.choose_many([(1, ListStatus.DROPPED), (2, ListStatus.WATCHING)])
+
+    assert isinstance(step, Finished)
+    assert step.imported == (
+        ImportedAnime(10, "Hellsing", ListStatus.DROPPED),
+        ImportedAnime(20, "Hellsing", ListStatus.WATCHING),
+    )
+
+
+@pytest.mark.parametrize(
+    "selections",
+    [
+        [],
+        [(3, ListStatus.COMPLETED)],
+        [(0, ListStatus.COMPLETED)],
+        [(1, ListStatus.COMPLETED), (1, ListStatus.DROPPED)],
+    ],
+)
+def test_choose_many_invalid_raises_and_keeps_question(selections):
+    session, _ = _tie_session()
+    step = session.start()
+
+    with pytest.raises(ValueError):
+        session.choose_many(selections)
+
+    assert session.current is step
+    assert session.progress == (0, 1)
+
+
+def test_choose_many_on_normalization_choice_raises():
+    session, _ = _session(
+        ["naruto"],
+        [NormalizedTitle(1, "Naruto", ambiguous=True, options=("A", "B"))],
+        {},
+    )
+    step = session.start()
+
+    with pytest.raises(ValueError):
+        session.choose_many([(1, ListStatus.COMPLETED)])
+
+    assert session.current is step
+
+
+def test_auto_match_uses_suggested_status_from_airing():
+    airing = AnimeCandidate(5, "Frieren", airing_status=AiringStatus.AIRING)
+    session, _ = _session(["f"], [NormalizedTitle(1, "Frieren")], {"Frieren": [airing]})
+
+    step = session.start()
+
+    assert isinstance(step, Finished)
+    assert step.imported == (ImportedAnime(5, "Frieren", ListStatus.WATCHING),)
+
+
+def test_choose_uses_suggested_status_of_candidate():
+    options = [
+        AnimeCandidate(10, "Hellsing", airing_status=AiringStatus.NOT_YET_AIRED),
+        AnimeCandidate(20, "Hellsing"),
+    ]
+    session, _ = _session(["h"], [NormalizedTitle(1, "Hellsing")], {"Hellsing": options})
+    session.start()
+
+    step = session.choose(1)
+
+    assert step.imported == (ImportedAnime(10, "Hellsing", ListStatus.PLAN_TO_WATCH),)
+
+
+def test_duplicate_mal_id_last_import_wins():
+    naruto = [AnimeCandidate(20, "Naruto", airing_status=AiringStatus.AIRING)]
+    session, _ = _session(
+        ["a", "b"],
+        [NormalizedTitle(1, "Naruto"), NormalizedTitle(2, "Hellsing")],
+        {"Naruto": naruto, "Hellsing": _hellsing_tie()},
+    )
+    session.start()
+
+    step = session.choose_many([(2, ListStatus.DROPPED)])
+
+    assert isinstance(step, Finished)
+    assert step.imported == (ImportedAnime(20, "Hellsing", ListStatus.DROPPED),)

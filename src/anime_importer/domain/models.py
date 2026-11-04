@@ -19,6 +19,14 @@ class AiringStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ListStatus(StrEnum):
+    COMPLETED = "completed"
+    WATCHING = "watching"
+    PLAN_TO_WATCH = "plan_to_watch"
+    ON_HOLD = "on_hold"
+    DROPPED = "dropped"
+
+
 @dataclass(frozen=True, slots=True)
 class AnimeCandidate:
     """Resultado de búsqueda (reemplaza el dict {"id", "title", "imagen"})."""
@@ -31,6 +39,18 @@ class AnimeCandidate:
     year: int | None = None
     episodes: int | None = None
     airing_status: AiringStatus = AiringStatus.UNKNOWN
+
+
+_SUGGESTED_STATUS = {
+    AiringStatus.FINISHED: ListStatus.COMPLETED,
+    AiringStatus.AIRING: ListStatus.WATCHING,
+    AiringStatus.NOT_YET_AIRED: ListStatus.PLAN_TO_WATCH,
+    AiringStatus.UNKNOWN: ListStatus.COMPLETED,
+}
+
+
+def suggest_list_status(airing: AiringStatus) -> ListStatus:
+    return _SUGGESTED_STATUS[airing]
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +70,7 @@ class ImportedAnime:
 
     mal_id: int
     title: str
+    list_status: ListStatus = ListStatus.COMPLETED
 
 
 @dataclass(frozen=True, slots=True)

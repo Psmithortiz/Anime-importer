@@ -2,7 +2,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from anime_importer.domain.models import AiringStatus, MediaType
+from anime_importer.domain.models import (
+    AiringStatus,
+    ListStatus,
+    MediaType,
+    suggest_list_status,
+)
 from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
 
 SessionStatus = Literal["normalizing", "question", "finished", "failed"]
@@ -16,6 +21,15 @@ class ChooseRequest(BaseModel):
     option: int = Field(ge=1)
 
 
+class SelectionIn(BaseModel):
+    option: int = Field(ge=1)
+    status: ListStatus
+
+
+class ChooseManyRequest(BaseModel):
+    selections: list[SelectionIn] = Field(min_length=1)
+
+
 class OptionOut(BaseModel):
     number: int
     label: str
@@ -25,6 +39,7 @@ class OptionOut(BaseModel):
     year: int | None = None
     episodes: int | None = None
     airing_status: AiringStatus | None = None
+    suggested_status: ListStatus | None = None
 
 
 class QuestionOut(BaseModel):
@@ -46,6 +61,7 @@ class RejectedOut(BaseModel):
 
 class SummaryOut(BaseModel):
     imported: int
+    by_status: dict[ListStatus, int]
     rejected: list[RejectedOut]
 
 
@@ -82,6 +98,7 @@ def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
                 year=candidate.year,
                 episodes=candidate.episodes,
                 airing_status=candidate.airing_status,
+                suggested_status=suggest_list_status(candidate.airing_status),
             )
             for number, candidate in enumerate(step.options, start=1)
         ],

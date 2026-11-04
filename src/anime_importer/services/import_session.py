@@ -5,8 +5,10 @@ from anime_importer.domain.matching import match_candidates
 from anime_importer.domain.models import (
     AnimeCandidate,
     ImportedAnime,
+    ListStatus,
     NormalizedTitle,
     RejectedTitle,
+    suggest_list_status,
 )
 from anime_importer.ports import AnimeSearcher, SearchError, TitleNormalizer
 
@@ -35,6 +37,14 @@ class Finished:
 
 
 Step = NormalizationChoice | CandidateChoice | Finished
+
+
+def _imported_from(candidate: AnimeCandidate) -> ImportedAnime:
+    return ImportedAnime(
+        mal_id=candidate.mal_id,
+        title=candidate.title,
+        list_status=suggest_list_status(candidate.airing_status),
+    )
 
 
 class ImportSession:
@@ -91,8 +101,31 @@ class ImportSession:
                 self._current = question
                 return question
         else:
-            chosen = step.options[index]
-            self._imported.append(ImportedAnime(mal_id=chosen.mal_id, title=chosen.title))
+            self._imported.append(_imported_from(step.options[index]))
+        self._position += 1
+        return self._advance()
+
+    def choose_many(self, selections: Sequence[tuple[int, ListStatus]]) -> Step:
+        """Importa varias opciones de la pregunta actual, cada una con su estado de lista.
+
+        Solo vale para CandidateChoice. Ante un ValueError la sesión no cambia.
+        """
+        step = self._pending_question()
+        if not isinstance(step, CandidateChoice):
+            raise ValueError("choose_many solo aplica a preguntas de candidatos")  # noqa: TRY004
+        if not selections:
+            raise ValueError("Debes elegir al menos una opción")
+        numbers = [number for number, _ in selections]
+        if len(set(numbers)) != len(numbers):
+            raise ValueError("Opciones repetidas")
+        for number in numbers:
+            if not 1 <= number <= len(step.options):
+                raise ValueError(f"Opción fuera de rango: {number}")
+        for number, status in selections:
+            chosen = step.options[number - 1]
+            self._imported.append(
+                ImportedAnime(mal_id=chosen.mal_id, title=chosen.title, list_status=status)
+            )
         self._position += 1
         return self._advance()
 
@@ -121,8 +154,10 @@ class ImportSession:
                 self._current = question
                 return question
             self._position += 1
+        # Si un mismo anime se importó varias veces, gana la última.
+        unique = {entry.mal_id: entry for entry in self._imported}
         self._current = Finished(
-            imported=tuple(self._imported),
+            imported=tuple(unique.values()),
             rejected=tuple(sorted(self._rejected, key=lambda r: r.reason)),
         )
         return self._current
@@ -151,8 +186,7 @@ class ImportSession:
             return None
         result = match_candidates(query, candidates)
         if result.accepted is not None:
-            accepted = result.accepted
-            self._imported.append(ImportedAnime(mal_id=accepted.mal_id, title=accepted.title))
+            self._imported.append(_imported_from(result.accepted))
             return None
         return CandidateChoice(original_title=original, query=query, options=result.options)
 

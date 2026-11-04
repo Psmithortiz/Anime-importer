@@ -66,7 +66,17 @@ def test_full_flow_and_export():
 
     done = client.post(f"/api/sessions/{session_id}/choose", json={"option": 2}).json()
     assert done["status"] == "finished"
-    assert done["summary"] == {"imported": 1, "rejected": []}
+    assert done["summary"] == {
+        "imported": 1,
+        "by_status": {
+            "completed": 1,
+            "watching": 0,
+            "plan_to_watch": 0,
+            "on_hold": 0,
+            "dropped": 0,
+        },
+        "rejected": [],
+    }
     assert done["question"] is None
 
     export = client.get(f"/api/sessions/{session_id}/export.xml")
@@ -171,3 +181,92 @@ def test_candidate_option_exposes_mal_metadata():
     assert options[1]["year"] == 2001
     assert options[1]["episodes"] == 13
     assert options[1]["airing_status"] == "finished"
+
+
+def test_choose_many_flow_and_by_status():
+    client = _client()
+    session_id = _create(client)
+
+    view = client.post(
+        f"/api/sessions/{session_id}/choose-many",
+        json={
+            "selections": [
+                {"option": 1, "status": "watching"},
+                {"option": 2, "status": "dropped"},
+            ]
+        },
+    ).json()
+
+    assert view["status"] == "finished"
+    assert view["summary"]["imported"] == 2
+    assert view["summary"]["by_status"]["watching"] == 1
+    assert view["summary"]["by_status"]["dropped"] == 1
+    assert view["summary"]["by_status"]["completed"] == 0
+
+
+def test_candidate_option_has_suggested_status():
+    client = _client()
+    session_id = _create(client)
+
+    options = client.get(f"/api/sessions/{session_id}").json()["question"]["options"]
+
+    assert options[1]["suggested_status"] == "completed"
+
+
+def test_choose_many_empty_is_422():
+    client = _client()
+    session_id = _create(client)
+
+    response = client.post(f"/api/sessions/{session_id}/choose-many", json={"selections": []})
+
+    assert response.status_code == 422
+
+
+def test_choose_many_invalid_status_is_422():
+    client = _client()
+    session_id = _create(client)
+
+    response = client.post(
+        f"/api/sessions/{session_id}/choose-many",
+        json={"selections": [{"option": 1, "status": "nope"}]},
+    )
+
+    assert response.status_code == 422
+
+
+def test_choose_many_out_of_range_is_422_and_keeps_question():
+    client = _client()
+    session_id = _create(client)
+
+    response = client.post(
+        f"/api/sessions/{session_id}/choose-many",
+        json={"selections": [{"option": 9, "status": "completed"}]},
+    )
+
+    assert response.status_code == 422
+    assert client.get(f"/api/sessions/{session_id}").json()["status"] == "question"
+
+
+def test_choose_many_after_finished_is_409():
+    client = _client()
+    session_id = _create(client)
+    client.post(f"/api/sessions/{session_id}/discard")
+
+    response = client.post(
+        f"/api/sessions/{session_id}/choose-many",
+        json={"selections": [{"option": 1, "status": "completed"}]},
+    )
+
+    assert response.status_code == 409
+
+
+def test_export_overwrite_flag():
+    client = _client()
+    session_id = _create(client)
+    client.post(f"/api/sessions/{session_id}/choose", json={"option": 1})
+
+    default = client.get(f"/api/sessions/{session_id}/export.xml")
+    forced = client.get(f"/api/sessions/{session_id}/export.xml?overwrite=true")
+
+    assert "<update_on_import>0</update_on_import>" in default.text
+    assert "<update_on_import>1</update_on_import>" in forced.text

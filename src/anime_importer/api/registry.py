@@ -1,6 +1,7 @@
 import logging
 import threading
 import uuid
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
@@ -12,6 +13,7 @@ from anime_importer.api.schemas import (
     SummaryOut,
     question_out,
 )
+from anime_importer.domain.models import ListStatus
 from anime_importer.ports import NormalizationError
 from anime_importer.services.import_session import Finished, ImportSession, Step
 
@@ -54,6 +56,11 @@ class ManagedSession:
             self._require("question")
             self._apply(self.session.choose(option))
 
+    def choose_many(self, selections: Sequence[tuple[int, ListStatus]]) -> None:
+        with self.lock:
+            self._require("question")
+            self._apply(self.session.choose_many(selections))
+
     def discard(self) -> None:
         with self.lock:
             self._require("question")
@@ -78,8 +85,10 @@ class ManagedSession:
         elif status == "finished":
             step = self.session.current
             if isinstance(step, Finished):
+                counts = Counter(entry.list_status for entry in step.imported)
                 summary = SummaryOut(
                     imported=len(step.imported),
+                    by_status={kind: counts[kind] for kind in ListStatus},
                     rejected=[
                         RejectedOut(title=r.original_title, reason=r.reason) for r in step.rejected
                     ],

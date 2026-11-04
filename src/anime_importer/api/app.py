@@ -15,7 +15,12 @@ from anime_importer.api.registry import (
     SessionNotFoundError,
     SessionRegistry,
 )
-from anime_importer.api.schemas import ChooseRequest, CreateSessionRequest, SessionView
+from anime_importer.api.schemas import (
+    ChooseManyRequest,
+    ChooseRequest,
+    CreateSessionRequest,
+    SessionView,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -77,6 +82,16 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return managed.view()
 
+    @app.post("/api/sessions/{session_id}/choose-many", response_model=SessionView)
+    def choose_many(body: ChooseManyRequest, managed: ManagedDep) -> SessionView:
+        try:
+            managed.choose_many([(item.option, item.status) for item in body.selections])
+        except InvalidStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return managed.view()
+
     @app.post("/api/sessions/{session_id}/discard", response_model=SessionView)
     def discard(managed: ManagedDep) -> SessionView:
         try:
@@ -86,13 +101,13 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
         return managed.view()
 
     @app.get("/api/sessions/{session_id}/export.xml")
-    def export_xml(managed: ManagedDep) -> Response:
+    def export_xml(managed: ManagedDep, overwrite: bool = False) -> Response:
         try:
             finished = managed.finished()
         except InvalidStateError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from None
         return Response(
-            content=render_mal_xml(finished.imported),
+            content=render_mal_xml(finished.imported, update_on_import=overwrite),
             media_type="application/xml",
             headers={"Content-Disposition": 'attachment; filename="anime_import.xml"'},
         )

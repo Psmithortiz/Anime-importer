@@ -2,7 +2,13 @@ import dataclasses
 
 import pytest
 
-from anime_importer.domain.models import AnimeCandidate, NormalizedTitle
+from anime_importer.domain.models import (
+    AiringStatus,
+    AnimeCandidate,
+    ListStatus,
+    NormalizedTitle,
+    suggest_list_status,
+)
 
 
 def test_anime_candidate_is_immutable():
@@ -23,3 +29,16 @@ def test_normalized_title_defaults():
     assert title.is_anime is True
     assert title.ambiguous is False
     assert title.options == ()
+
+
+@pytest.mark.parametrize(
+    ("airing", "expected"),
+    [
+        (AiringStatus.FINISHED, ListStatus.COMPLETED),
+        (AiringStatus.AIRING, ListStatus.WATCHING),
+        (AiringStatus.NOT_YET_AIRED, ListStatus.PLAN_TO_WATCH),
+        (AiringStatus.UNKNOWN, ListStatus.COMPLETED),
+    ],
+)
+def test_suggest_list_status(airing, expected):
+    assert suggest_list_status(airing) is expected

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
@@ -86,3 +88,32 @@ def test_main_empty_input_returns_1_without_writing_files(monkeypatch, tmp_path)
 
     assert main(["--input", str(empty)]) == 1
     assert sorted(p.name for p in tmp_path.iterdir()) == ["vacio.txt"]
+
+
+class _AutoNormalizer:
+    def normalize(self, titles):
+        return [NormalizedTitle(1, "Naruto")]
+
+
+class _AutoSearcher:
+    def search(self, query):
+        return [AnimeCandidate(20, "Naruto")]
+
+
+@pytest.mark.parametrize(("flags", "expected"), [([], "0"), (["--overwrite"], "1")])
+def test_main_overwrite_flag_reaches_xml(monkeypatch, tmp_path, flags, expected):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("MAL_CLIENT_ID", "m")
+    monkeypatch.setattr(
+        "anime_importer.cli.build_session",
+        lambda settings, titles: ImportSession(titles, _AutoNormalizer(), _AutoSearcher()),
+    )
+    titles = tmp_path / "lista.txt"
+    titles.write_text("naruto\n", encoding="utf-8")
+    output = tmp_path / "out.xml"
+
+    code = main(["--input", str(titles), "--output", str(output), *flags])
+
+    assert code == 0
+    assert f"<update_on_import>{expected}</update_on_import>" in output.read_text(encoding="utf-8")

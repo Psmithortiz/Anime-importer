@@ -64,6 +64,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--input", type=Path, help="Lista de títulos (uno por línea)")
     parser.add_argument("--output", type=Path, help="Ruta del XML para MAL")
     parser.add_argument("--rejected", type=Path, help="Ruta del reporte de errores")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Sobrescribir entradas que ya existan en tu lista de MAL (update_on_import)",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -84,7 +89,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         logger.error("%s", exc)
         return 1
 
-    write_mal_xml(finished.imported, output_path)
+    write_mal_xml(finished.imported, output_path, update_on_import=args.overwrite)
     write_rejected_report(finished.rejected, rejected_path)
     print(
         f"\nImportados: {len(finished.imported)} | Rechazados: {len(finished.rejected)}"
