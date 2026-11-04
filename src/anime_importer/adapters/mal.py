@@ -5,8 +5,15 @@ from collections.abc import Callable
 import requests
 
 from anime_importer.adapters.http import Throttle, http_retry
-from anime_importer.domain.models import AiringStatus, AnimeCandidate, MediaType
-from anime_importer.ports import SearchError
+from anime_importer.domain.models import (
+    AiringStatus,
+    AnimeCandidate,
+    AnimeDetails,
+    MediaType,
+    Relation,
+    RelationType,
+)
+from anime_importer.ports import DetailsError, SearchError
 
 BASE_URL = "https://api.myanimelist.net/v2"
 _MAX_QUERY_LENGTH = 64
@@ -43,34 +50,47 @@ def parse_airing_status(value: str | None) -> AiringStatus:
     return _AIRING_STATUSES.get(value or "", AiringStatus.UNKNOWN)
 
 
+_RELATION_TYPES = {relation.value: relation for relation in RelationType}
+
+
+def parse_relation_type(value: str | None) -> RelationType:
+    return _RELATION_TYPES.get(value or "", RelationType.OTHER)
+
+
+def parse_anime_node(node: dict) -> AnimeCandidate:
+    picture = node.get("main_picture") or {}
+    alternatives = node.get("alternative_titles") or {}
+    alternative_titles = tuple(
+        title
+        for title in (
+            alternatives.get("en"),
+            alternatives.get("ja"),
+            *(alternatives.get("synonyms") or ()),
+        )
+        if title
+    )
+    return AnimeCandidate(
+        mal_id=node["id"],
+        title=node["title"],
+        image_url=picture.get("large") or picture.get("medium"),
+        alternative_titles=alternative_titles,
+        media_type=parse_media_type(node.get("media_type")),
+        year=(node.get("start_season") or {}).get("year"),
+        episodes=node.get("num_episodes") or None,
+        airing_status=parse_airing_status(node.get("status")),
+    )
+
+
 def parse_search_response(data: dict) -> list[AnimeCandidate]:
-    candidates = []
-    for item in data.get("data", []):
-        node = item["node"]
-        picture = node.get("main_picture") or {}
-        alternatives = node.get("alternative_titles") or {}
-        alternative_titles = tuple(
-            title
-            for title in (
-                alternatives.get("en"),
-                alternatives.get("ja"),
-                *(alternatives.get("synonyms") or ()),
-            )
-            if title
-        )
-        candidates.append(
-            AnimeCandidate(
-                mal_id=node["id"],
-                title=node["title"],
-                image_url=picture.get("large") or picture.get("medium"),
-                alternative_titles=alternative_titles,
-                media_type=parse_media_type(node.get("media_type")),
-                year=(node.get("start_season") or {}).get("year"),
-                episodes=node.get("num_episodes") or None,
-                airing_status=parse_airing_status(node.get("status")),
-            )
-        )
-    return candidates
+    return [parse_anime_node(item["node"]) for item in data.get("data", [])]
+
+
+def parse_details_response(data: dict) -> AnimeDetails:
+    relations = tuple(
+        Relation(item["node"]["id"], parse_relation_type(item.get("relation_type")))
+        for item in data.get("related_anime") or []
+    )
+    return AnimeDetails(candidate=parse_anime_node(data), relations=relations)
 
 
 class MalSearcher:
@@ -85,12 +105,15 @@ class MalSearcher:
         min_interval: float = 1.0,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        throttle: Throttle | None = None,
     ) -> None:
         self._session = session or requests.Session()
         self._session.headers["X-MAL-CLIENT-ID"] = client_id
         self._base_url = base_url
         self._timeout = timeout
-        self._throttle = Throttle(min_interval, clock=clock, sleep=sleep)
+        self._throttle = (
+            throttle if throttle is not None else Throttle(min_interval, clock=clock, sleep=sleep)
+        )
 
     def search(self, query: str) -> list[AnimeCandidate]:
         try:
@@ -113,3 +136,47 @@ class MalSearcher:
         )
         response.raise_for_status()
         return parse_search_response(response.json())
+
+
+class MalDetailsProvider:
+    """Fetch one anime with its relations from the official MyAnimeList API (v2)."""
+
+    def __init__(
+        self,
+        client_id: str,
+        session: requests.Session | None = None,
+        base_url: str = BASE_URL,
+        timeout: tuple[float, float] = (10, 30),
+        throttle: Throttle | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self._session = session or requests.Session()
+        self._session.headers["X-MAL-CLIENT-ID"] = client_id
+        self._base_url = base_url
+        self._timeout = timeout
+        self._throttle = (
+            throttle if throttle is not None else Throttle(1.0, clock=clock, sleep=sleep)
+        )
+
+    def get_details(self, mal_id: int) -> AnimeDetails:
+        try:
+            return self._get_with_retry(mal_id)
+        except requests.RequestException as exc:
+            raise DetailsError(str(exc)) from exc
+
+    @http_retry
+    def _get_with_retry(self, mal_id: int) -> AnimeDetails:
+        self._throttle.wait()
+        response = self._session.get(
+            f"{self._base_url}/anime/{mal_id}",
+            params={
+                "fields": (
+                    "alternative_titles,media_type,start_season,num_episodes,status,related_anime"
+                ),
+                "nsfw": "true",
+            },
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        return parse_details_response(response.json())

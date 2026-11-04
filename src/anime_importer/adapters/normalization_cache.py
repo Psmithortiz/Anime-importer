@@ -1,11 +1,11 @@
 import json
 import logging
-import os
 import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from anime_importer.adapters.json_files import write_json_atomic
 from anime_importer.domain.models import NormalizedTitle
 from anime_importer.ports import ChunkedNormalizer, ProgressCallback
 
@@ -51,10 +51,7 @@ class JsonCacheStore:
             merged = self._read()
             merged.update(entries)
             payload = {key: _to_dict(item) for key, item in merged.items()}
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_name(self._path.name + ".tmp")
-            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-            os.replace(tmp, self._path)
+            write_json_atomic(self._path, payload)
 
     def _read(self) -> dict[str, NormalizedTitle]:
         try:

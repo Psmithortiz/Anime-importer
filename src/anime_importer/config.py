@@ -16,3 +16,6 @@ class Settings(BaseSettings):
     output_xml_path: Path = Path("output.xml")
     rejected_report_path: Path = Path("errores.txt")
     normalization_cache_dir: Path = Path(".cache/normalization")
+    details_cache_path: Path = Path(".cache/mal_details.json")
+    details_cache_ttl_days: float = 7
+    franchise_max_nodes: int = 40

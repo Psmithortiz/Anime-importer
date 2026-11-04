@@ -79,3 +79,68 @@ class RejectedTitle:
 
     original_title: str
     reason: str
+
+
+class RelationType(StrEnum):
+    SEQUEL = "sequel"
+    PREQUEL = "prequel"
+    SIDE_STORY = "side_story"
+    PARENT_STORY = "parent_story"
+    SUMMARY = "summary"
+    FULL_STORY = "full_story"
+    ALTERNATIVE_VERSION = "alternative_version"
+    ALTERNATIVE_SETTING = "alternative_setting"
+    SPIN_OFF = "spin_off"
+    CHARACTER = "character"
+    OTHER = "other"
+
+
+# Relations whose target is also expanded when exploring a franchise.
+FOLLOWED_RELATIONS = frozenset(
+    {
+        RelationType.SEQUEL,
+        RelationType.PREQUEL,
+        RelationType.SIDE_STORY,
+        RelationType.PARENT_STORY,
+        RelationType.SUMMARY,
+        RelationType.FULL_STORY,
+    }
+)
+# Relations whose target is offered to the user but not expanded.
+SHOWN_RELATIONS = frozenset(
+    {
+        RelationType.ALTERNATIVE_VERSION,
+        RelationType.ALTERNATIVE_SETTING,
+        RelationType.SPIN_OFF,
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Relation:
+    """Link from one anime to another."""
+
+    mal_id: int
+    relation_type: RelationType
+
+
+@dataclass(frozen=True, slots=True)
+class AnimeDetails:
+    """An anime with its relations to other anime."""
+
+    candidate: AnimeCandidate
+    relations: tuple[Relation, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FranchiseEntry:
+    """Anime found while exploring a franchise, and how it was reached."""
+
+    candidate: AnimeCandidate
+    relation: RelationType
+
+
+@dataclass(frozen=True, slots=True)
+class Franchise:
+    entries: tuple[FranchiseEntry, ...] = ()
+    truncated: bool = False

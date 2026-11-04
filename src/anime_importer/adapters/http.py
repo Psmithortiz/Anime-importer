@@ -1,6 +1,7 @@
 """HTTP pieces shared by the search adapters."""
 
 import logging
+import threading
 import time
 from collections.abc import Callable
 
@@ -35,7 +36,7 @@ http_retry = retry(
 
 
 class Throttle:
-    """Guarantee a minimum interval between calls to wait()."""
+    """Guarantee a minimum interval between calls to wait(). Thread-safe and shareable."""
 
     def __init__(
         self,
@@ -47,10 +48,12 @@ class Throttle:
         self._clock = clock
         self._sleep = sleep
         self._last_request: float | None = None
+        self._lock = threading.Lock()
 
     def wait(self) -> None:
-        if self._last_request is not None:
-            elapsed = self._clock() - self._last_request
-            if elapsed < self._min_interval:
-                self._sleep(self._min_interval - elapsed)
-        self._last_request = self._clock()
+        with self._lock:
+            if self._last_request is not None:
+                elapsed = self._clock() - self._last_request
+                if elapsed < self._min_interval:
+                    self._sleep(self._min_interval - elapsed)
+            self._last_request = self._clock()

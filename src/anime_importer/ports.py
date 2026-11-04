@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from typing import Protocol
 
-from anime_importer.domain.models import AnimeCandidate, NormalizedTitle
+from anime_importer.domain.models import AnimeCandidate, AnimeDetails, NormalizedTitle
 
 
 class SearchError(Exception):
@@ -12,8 +12,16 @@ class NormalizationError(Exception):
     """The normalizer could not process the list."""
 
 
+class DetailsError(Exception):
+    """The details provider could not fetch an anime."""
+
+
 class AnimeSearcher(Protocol):
     def search(self, query: str) -> list[AnimeCandidate]: ...
+
+
+class AnimeDetailsProvider(Protocol):
+    def get_details(self, mal_id: int) -> AnimeDetails: ...
 
 
 ProgressCallback = Callable[[int, int], None]  # (done_titles, total_titles)

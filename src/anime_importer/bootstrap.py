@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from google import genai
 
 from anime_importer.adapters.gemini import GeminiNormalizer, cache_version
+from anime_importer.adapters.http import Throttle
 from anime_importer.adapters.mal import MalSearcher
 from anime_importer.adapters.normalization_cache import CachingNormalizer, JsonCacheStore
 from anime_importer.config import Settings
@@ -19,6 +20,7 @@ def build_session(settings: Settings, titles: Sequence[str]) -> ImportSession:
         settings.normalization_cache_dir / f"{cache_version(settings.gemini_model)}.json"
     )
     normalizer = CachingNormalizer(inner=gemini, store=store)
-    return ImportSession(
-        titles, normalizer=normalizer, searcher=MalSearcher(client_id=settings.mal_client_id)
-    )
+    # One throttle for every MAL adapter so they share the same request budget.
+    mal_throttle = Throttle(1.0)
+    searcher = MalSearcher(client_id=settings.mal_client_id, throttle=mal_throttle)
+    return ImportSession(titles, normalizer=normalizer, searcher=searcher)
