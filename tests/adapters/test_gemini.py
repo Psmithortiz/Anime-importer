@@ -1,0 +1,79 @@
+import json
+from types import SimpleNamespace
+
+import pytest
+from google.genai import errors
+
+from anime_importer.adapters.gemini import (
+    BatchValidationError,
+    GeminiNormalizer,
+    is_retryable,
+    parse_normalization_response,
+)
+
+
+def _response(count: int) -> str:
+    return json.dumps([{"n": i, "romaji": f"T{i}"} for i in range(1, count + 1)])
+
+
+def test_parse_strips_fences_and_converts_fields():
+    text = '```json\n[{"n": 1, "romaji": "A", "ambiguous": true, "options": ["x", "y"]}]\n```'
+    (item,) = parse_normalization_response(text, 1)
+    assert item.index == 1
+    assert item.romaji == "A"
+    assert item.ambiguous is True
+    assert item.options == ("x", "y")
+
+
+def test_parse_missing_romaji_defaults_to_empty():
+    (item,) = parse_normalization_response('[{"n": 1}]', 1)
+    assert item.romaji == ""
+    assert item.is_anime is True
+    assert item.options == ()
+
+
+def test_parse_wrong_length_raises():
+    with pytest.raises(BatchValidationError):
+        parse_normalization_response(_response(1), 2)
+
+
+def test_parse_wrong_indexes_raises():
+    with pytest.raises(BatchValidationError):
+        parse_normalization_response('[{"n": 1}, {"n": 3}]', 2)
+
+
+def test_parse_not_a_list_raises():
+    with pytest.raises(BatchValidationError):
+        parse_normalization_response("{}", 1)
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    [
+        (errors.ClientError(429, {}), True),
+        (errors.ClientError(400, {}), False),
+        (errors.ServerError(500, {}), True),
+        (ValueError(), False),
+    ],
+)
+def test_is_retryable(exc, expected):
+    assert is_retryable(exc) is expected
+
+
+def test_normalize_chunks_renumbers_and_sleeps_between_chunks():
+    calls = []
+
+    def generate_content(model, contents, config):
+        calls.append(contents)
+        count = 2 if len(calls) == 1 else 1
+        return SimpleNamespace(text=_response(count))
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    sleeps = []
+    normalizer = GeminiNormalizer(client=client, chunk_size=2, sleep=sleeps.append)
+
+    result = normalizer.normalize(["a", "b", "c"])
+
+    assert [t.index for t in result] == [1, 2, 3]
+    assert len(calls) == 2
+    assert sleeps == [13]
