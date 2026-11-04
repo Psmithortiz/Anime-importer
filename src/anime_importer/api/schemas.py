@@ -63,6 +63,7 @@ class QuestionOut(BaseModel):
     franchise: list[FranchiseOptionOut] = []
     franchise_truncated: bool = False
     preselected: list[int] = []
+    used_fallback: bool = False
 
 
 class ProgressOut(BaseModel):
@@ -136,4 +137,5 @@ def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
         ],
         franchise_truncated=step.franchise.truncated,
         preselected=sorted(step.preselected),
+        used_fallback=step.used_fallback,
     )

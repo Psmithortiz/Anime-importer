@@ -36,6 +36,7 @@ class CandidateChoice:
     options: tuple[AnimeCandidate, ...]
     franchise: Franchise = field(default_factory=Franchise)
     preselected: frozenset[int] = frozenset()  # mal_ids marked in advance
+    used_fallback: bool = False  # the query is the user's original line, not the normalized one
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +81,10 @@ def _imported_from(candidate: AnimeCandidate) -> ImportedAnime:
         title=candidate.title,
         list_status=suggest_list_status(candidate.airing_status),
     )
+
+
+def _same_query(a: str, b: str) -> bool:
+    return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
 
 
 def _start_thread(work: Callable[[], None]) -> None:
@@ -265,8 +270,19 @@ class ImportSession:
             candidates = self._searcher.search(query)
         except SearchError as exc:
             return Rejected(f"Search error: {exc}")
+        used_fallback = False
         if not candidates:
-            return Rejected(f"No results (query: {query})")
+            if _same_query(original, query):
+                return Rejected(f"No results (query: {query})")
+            # The normalized title found nothing: try the user's original line.
+            try:
+                candidates = self._searcher.search(original)
+            except SearchError as exc:
+                return Rejected(f"Search error: {exc}")
+            if not candidates:
+                return Rejected(f"No results (queries: {query!r}, {original!r})")
+            query = original
+            used_fallback = True
         result = match_candidates(query, candidates)
         finder = self._franchise_finder
         if result.accepted is not None:
@@ -281,6 +297,7 @@ class ImportSession:
                     options=(accepted,),
                     franchise=franchise,
                     preselected=frozenset({accepted.mal_id}),
+                    used_fallback=used_fallback,
                 )
             )
         franchise = (
@@ -288,7 +305,11 @@ class ImportSession:
         )
         return Ask(
             CandidateChoice(
-                original_title=original, query=query, options=result.options, franchise=franchise
+                original_title=original,
+                query=query,
+                options=result.options,
+                franchise=franchise,
+                used_fallback=used_fallback,
             )
         )
 

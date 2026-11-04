@@ -91,7 +91,8 @@ def test_no_results_is_rejected():
 
     assert isinstance(step, Finished)
     assert step.imported == ()
-    assert [r.reason for r in step.rejected] == ["No results (query: Foo)"]
+    # "x" differs from "Foo", so the original line was tried as a fallback too.
+    assert [r.reason for r in step.rejected] == ["No results (queries: 'Foo', 'x')"]
     assert step.rejected[0].original_title == "x"
 
 

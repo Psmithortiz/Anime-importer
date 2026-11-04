@@ -163,6 +163,7 @@ function renderQuestion(view) {
   } else {
     query.hidden = true;
   }
+  $("question-fallback").hidden = !(question.kind === "candidate" && question.used_fallback);
   $("question-google").href = googleUrl(question.original_title);
 
   const container = $("options");
