@@ -43,6 +43,12 @@ PROMPT_TEMPLATE = """You are an expert anime title normalizer.
 """
 
 
+DAILY_QUOTA_MESSAGE = (
+    "Gemini daily quota exhausted for this API key. "
+    "Switch GEMINI_API_KEY and restart the server; titles already normalized are cached."
+)
+
+
 class BatchValidationError(Exception):
     pass
 
@@ -82,7 +88,13 @@ def parse_normalization_response(text: str | None, expected_count: int) -> list[
     return sorted(results, key=lambda t: t.index)
 
 
+def is_daily_quota_exhausted(exc: BaseException) -> bool:
+    return isinstance(exc, errors.ClientError) and exc.code == 429 and "PerDay" in str(exc)
+
+
 def is_retryable(exc: BaseException) -> bool:
+    if is_daily_quota_exhausted(exc):
+        return False
     if isinstance(exc, (errors.ServerError, json.JSONDecodeError, BatchValidationError)):
         return True
     return isinstance(exc, errors.ClientError) and exc.code == 429
@@ -130,6 +142,8 @@ class GeminiNormalizer:
             try:
                 chunk_results = self._normalize_chunk(chunk)
             except (errors.APIError, json.JSONDecodeError, BatchValidationError, KeyError) as exc:
+                if is_daily_quota_exhausted(exc):
+                    raise NormalizationError(DAILY_QUOTA_MESSAGE) from exc
                 raise NormalizationError(
                     f"Normalization failed for chunk {number}/{len(chunks)}: {exc}"
                 ) from exc

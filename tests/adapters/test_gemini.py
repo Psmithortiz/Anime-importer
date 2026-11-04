@@ -8,6 +8,7 @@ from google.genai import errors
 from anime_importer.adapters.gemini import (
     BatchValidationError,
     GeminiNormalizer,
+    is_daily_quota_exhausted,
     is_retryable,
     parse_normalization_response,
     wait_seconds,
@@ -61,6 +62,63 @@ def test_parse_not_a_list_raises():
 )
 def test_is_retryable(exc, expected):
     assert is_retryable(exc) is expected
+
+
+def _quota_error(quota_id: str) -> errors.ClientError:
+    return errors.ClientError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "Quota exceeded",
+                "details": [{"violations": [{"quotaId": quota_id}]}],
+            }
+        },
+    )
+
+
+DAILY_QUOTA = _quota_error("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+MINUTE_QUOTA = _quota_error("GenerateRequestsPerMinutePerProjectPerModel-FreeTier")
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    [
+        (DAILY_QUOTA, True),
+        (MINUTE_QUOTA, False),
+        (errors.ClientError(400, {"error": {"message": "PerDay"}}), False),
+        (errors.ServerError(500, {"error": {"message": "PerDay"}}), False),
+    ],
+)
+def test_is_daily_quota_exhausted(exc, expected):
+    assert is_daily_quota_exhausted(exc) is expected
+
+
+def test_is_retryable_depends_on_quota_kind():
+    assert is_retryable(DAILY_QUOTA) is False
+    assert is_retryable(MINUTE_QUOTA) is True
+
+
+def test_normalize_daily_quota_fails_fast_without_retries():
+    calls = []
+
+    def generate_content(model, contents, config):
+        calls.append(contents)
+        raise DAILY_QUOTA
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    normalizer = GeminiNormalizer(client=client, sleep=lambda _: None)
+
+    with pytest.raises(NormalizationError, match="daily quota exhausted") as exc_info:
+        normalizer.normalize(["a"])
+
+    assert str(exc_info.value) == (
+        "Gemini daily quota exhausted for this API key. "
+        "Switch GEMINI_API_KEY and restart the server; titles already normalized are cached."
+    )
+    assert exc_info.value.__cause__ is DAILY_QUOTA
+    assert len(calls) == 1
 
 
 def test_normalize_chunks_renumbers_and_sleeps_between_chunks():
