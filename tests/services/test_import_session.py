@@ -46,7 +46,9 @@ class ProgressNormalizer:
 
 
 def test_exposes_normalization_progress_after_start():
-    session = ImportSession(["a", "b"], ProgressNormalizer(), FakeSearcher({}))
+    session = ImportSession(
+        ["a", "b"], ProgressNormalizer(), FakeSearcher({}), run_in_background=lambda fn: fn()
+    )
     assert session.normalization_progress is None
 
     session.start()
@@ -56,7 +58,12 @@ def test_exposes_normalization_progress_after_start():
 
 def _session(titles, normalized, results):
     searcher = FakeSearcher(results)
-    return ImportSession(titles, FakeNormalizer(normalized), searcher), searcher
+    return (
+        ImportSession(
+            titles, FakeNormalizer(normalized), searcher, run_in_background=lambda fn: fn()
+        ),
+        searcher,
+    )
 
 
 def _hellsing_tie():
@@ -156,7 +163,8 @@ def test_ambiguous_normalization_searches_chosen_option_and_continues():
         ImportedAnime(1735, "Naruto Shippuden"),
         ImportedAnime(269, "Bleach"),
     )
-    assert searcher.queries == ["Naruto Shippuden", "Bleach"]
+    # Bleach is resolved ahead by the worker, before the user answers the first question.
+    assert sorted(searcher.queries) == ["Bleach", "Naruto Shippuden"]
 
 
 def test_ambiguous_choice_can_lead_to_candidate_choice():

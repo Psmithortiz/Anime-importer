@@ -46,7 +46,11 @@ TIE = [AnimeCandidate(10, "Hellsing"), AnimeCandidate(20, "Hellsing")]
 
 def _session(results, finder):
     return ImportSession(
-        ["Hellsing"], FakeNormalizer(), FakeSearcher(results), franchise_finder=finder
+        ["Hellsing"],
+        FakeNormalizer(),
+        FakeSearcher(results),
+        franchise_finder=finder,
+        run_in_background=lambda fn: fn(),
     )
 
 

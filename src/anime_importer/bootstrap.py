@@ -40,4 +40,10 @@ def build_session(
             return discover_franchise(seed_ids, details, settings.franchise_max_nodes)
 
         finder = find_franchise
-    return ImportSession(titles, normalizer=normalizer, searcher=searcher, franchise_finder=finder)
+    return ImportSession(
+        titles,
+        normalizer=normalizer,
+        searcher=searcher,
+        franchise_finder=finder,
+        resolution_buffer=settings.resolution_buffer,
+    )

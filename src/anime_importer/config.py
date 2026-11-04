@@ -19,3 +19,4 @@ class Settings(BaseSettings):
     details_cache_path: Path = Path(".cache/mal_details.json")
     details_cache_ttl_days: float = 7
     franchise_max_nodes: int = 40
+    resolution_buffer: int = 20

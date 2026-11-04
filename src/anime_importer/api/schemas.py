@@ -11,7 +11,7 @@ from anime_importer.domain.models import (
 )
 from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
 
-SessionStatus = Literal["normalizing", "question", "finished", "failed"]
+SessionStatus = Literal["preparing", "question", "finished", "failed"]
 
 
 class CreateSessionRequest(BaseModel):
@@ -86,6 +86,7 @@ class SessionView(BaseModel):
     status: SessionStatus
     progress: ProgressOut
     normalization: ProgressOut | None = None
+    resolution: ProgressOut | None = None
     error: str | None = None
     question: QuestionOut | None = None
     summary: SummaryOut | None = None

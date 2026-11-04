@@ -37,7 +37,11 @@ class FakeSearcher:
 def _client() -> TestClient:
     def factory(titles):
         return ImportSession(
-            titles, FakeNormalizer(), FakeSearcher(), franchise_finder=lambda seeds: FRANCHISE
+            titles,
+            FakeNormalizer(),
+            FakeSearcher(),
+            franchise_finder=lambda seeds: FRANCHISE,
+            run_in_background=lambda fn: fn(),
         )
 
     return TestClient(create_app(factory))

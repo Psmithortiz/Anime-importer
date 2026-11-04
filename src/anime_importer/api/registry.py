@@ -15,7 +15,12 @@ from anime_importer.api.schemas import (
 )
 from anime_importer.domain.models import ListStatus
 from anime_importer.ports import NormalizationError
-from anime_importer.services.import_session import Finished, ImportSession, Step
+from anime_importer.services.import_session import (
+    Finished,
+    ImportSession,
+    ResolutionError,
+    Step,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,18 +39,20 @@ class InvalidStateError(Exception):
 class ManagedSession:
     id: str
     session: ImportSession
-    status: SessionStatus = "normalizing"
+    status: SessionStatus = "preparing"
     error: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def run_start(self) -> None:
-        """Runs in the background. Must never leave the status at "normalizing"."""
+        """Runs in the background. Must never leave the status at "preparing"."""
         with self.lock:
             try:
                 self._apply(self.session.start())
             except NormalizationError as exc:
                 self.error = str(exc)
                 self.status = "failed"
+            except ResolutionError:
+                self._fail_resolution()
             except Exception:
                 logger.exception("Session %s failed", self.id)
                 self.error = "Internal error while processing the list"
@@ -54,17 +61,17 @@ class ManagedSession:
     def choose(self, option: int) -> None:
         with self.lock:
             self._require("question")
-            self._apply(self.session.choose(option))
+            self._advance_with(lambda: self.session.choose(option))
 
     def choose_many(self, selections: Sequence[tuple[int, ListStatus]]) -> None:
         with self.lock:
             self._require("question")
-            self._apply(self.session.choose_many(selections))
+            self._advance_with(lambda: self.session.choose_many(selections))
 
     def discard(self) -> None:
         with self.lock:
             self._require("question")
-            self._apply(self.session.discard())
+            self._advance_with(self.session.discard)
 
     def finished(self) -> Finished:
         self._require("finished")
@@ -79,10 +86,14 @@ class ManagedSession:
         question = None
         summary = None
         normalization = None
-        if status == "normalizing":
+        resolution = None
+        if status == "preparing":
             reported = self.session.normalization_progress  # tuple read: atomic snapshot
             if reported is not None:
                 normalization = ProgressOut(done=reported[0], total=reported[1])
+            looked_up = self.session.resolution_progress
+            if looked_up is not None:
+                resolution = ProgressOut(done=looked_up[0], total=looked_up[1])
         elif status == "question":
             step = self.session.current
             if not isinstance(step, Finished):
@@ -103,10 +114,23 @@ class ManagedSession:
             status=status,
             progress=ProgressOut(done=done, total=total),
             normalization=normalization,
+            resolution=resolution,
             error=self.error,
             question=question,
             summary=summary,
         )
+
+    def _advance_with(self, action: Callable[[], Step]) -> None:
+        """Run a session action; a failed background resolution turns the session into "failed"."""
+        try:
+            self._apply(action())
+        except ResolutionError:
+            self._fail_resolution()
+
+    def _fail_resolution(self) -> None:
+        logger.exception("Session %s: resolving titles failed", self.id)
+        self.error = "Looking up titles on MAL failed; check the server logs"
+        self.status = "failed"
 
     def _apply(self, step: Step) -> None:
         self.status = "finished" if isinstance(step, Finished) else "question"

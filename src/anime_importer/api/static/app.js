@@ -5,7 +5,7 @@
 
 const POLL_INTERVAL_MS = 2000;
 
-const SCREENS = ["start", "normalizing", "question", "finished", "failed"];
+const SCREENS = ["start", "preparing", "question", "finished", "failed"];
 
 const $ = (id) => document.getElementById(id);
 
@@ -116,8 +116,8 @@ function schedulePoll() {
 
 function render(view) {
   currentView = view;
-  if (view.status === "normalizing") {
-    renderNormalizing(view);
+  if (view.status === "preparing") {
+    renderPreparing(view);
     schedulePoll();
     return;
   }
@@ -127,20 +127,18 @@ function render(view) {
   else renderFailed(view);
 }
 
-function renderNormalizing(view) {
-  const reported = view.normalization;
-  const bar = $("normalizing-bar");
-  if (reported) {
-    $("normalizing-msg").textContent =
-      `Normalizing with Gemini… ${reported.done} / ${reported.total} titles`;
-    const percent = reported.total > 0 ? (reported.done / reported.total) * 100 : 0;
-    $("normalizing-fill").style.width = `${percent}%`;
-    bar.hidden = false;
-  } else {
-    $("normalizing-msg").textContent = `Normalizing ${view.progress.total} titles with Gemini…`;
-    bar.hidden = true;
-  }
-  showScreen("normalizing");
+function renderPhase(prefix, reported, fallbackTotal) {
+  const done = reported ? reported.done : 0;
+  const total = reported ? reported.total : fallbackTotal;
+  $(`${prefix}-msg`).textContent = `${$(`${prefix}-msg`).dataset.label} ${done} / ${total}`;
+  const percent = total > 0 ? (done / total) * 100 : 0;
+  $(`${prefix}-fill`).style.width = `${percent}%`;
+}
+
+function renderPreparing(view) {
+  renderPhase("normalizing", view.normalization, view.progress.total);
+  renderPhase("resolving", view.resolution, view.progress.total);
+  showScreen("preparing");
 }
 
 function renderQuestion(view) {

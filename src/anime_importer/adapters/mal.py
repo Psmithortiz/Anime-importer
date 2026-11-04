@@ -1,4 +1,5 @@
 import re
+import threading
 import time
 from collections.abc import Callable
 
@@ -114,6 +115,8 @@ class MalSearcher:
         self._throttle = (
             throttle if throttle is not None else Throttle(min_interval, clock=clock, sleep=sleep)
         )
+        # A requests.Session is not guaranteed to be thread-safe: serialize its use.
+        self._http_lock = threading.Lock()
 
     def search(self, query: str) -> list[AnimeCandidate]:
         try:
@@ -124,18 +127,19 @@ class MalSearcher:
     @http_retry
     def _search_with_retry(self, query: str) -> list[AnimeCandidate]:
         self._throttle.wait()
-        response = self._session.get(
-            f"{self._base_url}/anime",
-            params={
-                "q": sanitize_query(query),
-                "limit": 100,
-                "fields": "alternative_titles,media_type,start_season,num_episodes,status",
-                "nsfw": "true",
-            },
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-        return parse_search_response(response.json())
+        with self._http_lock:
+            response = self._session.get(
+                f"{self._base_url}/anime",
+                params={
+                    "q": sanitize_query(query),
+                    "limit": 100,
+                    "fields": "alternative_titles,media_type,start_season,num_episodes,status",
+                    "nsfw": "true",
+                },
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            return parse_search_response(response.json())
 
 
 class MalDetailsProvider:
@@ -158,6 +162,8 @@ class MalDetailsProvider:
         self._throttle = (
             throttle if throttle is not None else Throttle(1.0, clock=clock, sleep=sleep)
         )
+        # A requests.Session is not guaranteed to be thread-safe: serialize its use.
+        self._http_lock = threading.Lock()
 
     def get_details(self, mal_id: int) -> AnimeDetails:
         try:
@@ -168,15 +174,17 @@ class MalDetailsProvider:
     @http_retry
     def _get_with_retry(self, mal_id: int) -> AnimeDetails:
         self._throttle.wait()
-        response = self._session.get(
-            f"{self._base_url}/anime/{mal_id}",
-            params={
-                "fields": (
-                    "alternative_titles,media_type,start_season,num_episodes,status,related_anime"
-                ),
-                "nsfw": "true",
-            },
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-        return parse_details_response(response.json())
+        with self._http_lock:
+            response = self._session.get(
+                f"{self._base_url}/anime/{mal_id}",
+                params={
+                    "fields": (
+                        "alternative_titles,media_type,start_season,num_episodes,status,"
+                        "related_anime"
+                    ),
+                    "nsfw": "true",
+                },
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            return parse_details_response(response.json())

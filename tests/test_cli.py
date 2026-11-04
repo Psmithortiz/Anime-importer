@@ -19,7 +19,9 @@ class FakeSearcher:
 
 
 def _session() -> ImportSession:
-    return ImportSession(["hellsing"], FakeNormalizer(), FakeSearcher())
+    return ImportSession(
+        ["hellsing"], FakeNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
+    )
 
 
 def _reader(answers: list[str]):
@@ -108,7 +110,7 @@ def test_main_overwrite_flag_reaches_xml(monkeypatch, tmp_path, flags, expected)
     monkeypatch.setattr(
         "anime_importer.cli.build_session",
         lambda settings, titles, with_franchise=True: ImportSession(
-            titles, _AutoNormalizer(), _AutoSearcher()
+            titles, _AutoNormalizer(), _AutoSearcher(), run_in_background=lambda fn: fn()
         ),
     )
     titles = tmp_path / "list.txt"

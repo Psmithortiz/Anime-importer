@@ -21,14 +21,14 @@
         <button id="start-btn" class="primary" type="button" disabled>Start import</button>
       </section>
 
-      <!-- 2. Normalizing -->
-      <section id="screen-normalizing" hidden>
+      <!-- 2. Preparing -->
+      <section id="screen-preparing" hidden>
         <h1>Anime Importer</h1>
         <div class="spinner" aria-hidden="true"></div>
-        <p id="normalizing-msg" class="center"></p>
-        <div id="normalizing-bar" class="progress-bar" hidden>
-          <div id="normalizing-fill" class="progress-fill"></div>
-        </div>
+        <p id="normalizing-msg" class="center" data-label="Normalizing with Gemini…"></p>
+        <div class="progress-bar"><div id="normalizing-fill" class="progress-fill"></div></div>
+        <p id="resolving-msg" class="center" data-label="Looking up on MAL…"></p>
+        <div class="progress-bar"><div id="resolving-fill" class="progress-fill"></div></div>
         <p id="poll-warning" class="warning center" hidden>
           Can't reach the server. Retrying…
         </p>

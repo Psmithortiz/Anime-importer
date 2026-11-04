@@ -39,7 +39,12 @@ class FakeSearcher:
 
 def _client(normalizer=None) -> TestClient:
     def factory(titles):
-        return ImportSession(titles, normalizer or FakeNormalizer(), FakeSearcher())
+        return ImportSession(
+            titles,
+            normalizer or FakeNormalizer(),
+            FakeSearcher(),
+            run_in_background=lambda fn: fn(),
+        )
 
     return TestClient(create_app(factory))
 
@@ -47,7 +52,7 @@ def _client(normalizer=None) -> TestClient:
 def _create(client: TestClient, text: str = "hellsing") -> str:
     response = client.post("/api/sessions", json={"text": text})
     assert response.status_code == 202
-    assert response.json()["status"] == "normalizing"
+    assert response.json()["status"] == "preparing"
     return response.json()["id"]
 
 
@@ -290,13 +295,70 @@ def test_final_view_has_no_normalization_progress():
     assert view["normalization"] is None
 
 
-def test_view_includes_normalization_progress_while_normalizing():
-    session = ImportSession(["a", "b", "c"], ProgressNormalizer(), FakeSearcher())
+def test_view_includes_normalization_progress_while_preparing():
+    session = ImportSession(
+        ["a", "b", "c"], ProgressNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
+    )
     session.start()  # reports (3, 3)
-    managed = ManagedSession(id="x", session=session, status="normalizing")
+    managed = ManagedSession(id="x", session=session, status="preparing")
 
     view = managed.view()
 
-    assert view.status == "normalizing"
+    assert view.status == "preparing"
     assert view.normalization is not None
     assert (view.normalization.done, view.normalization.total) == (3, 3)
+
+
+class ExplodingSearcher:
+    def search(self, query):
+        raise RuntimeError("boom")
+
+
+def test_unexpected_resolution_error_leaves_the_session_failed():
+    def factory(titles):
+        return ImportSession(
+            titles, FakeNormalizer(), ExplodingSearcher(), run_in_background=lambda fn: fn()
+        )
+
+    client = TestClient(create_app(factory))
+    session_id = client.post("/api/sessions", json={"text": "a"}).json()["id"]
+
+    view = client.get(f"/api/sessions/{session_id}").json()
+
+    assert view["status"] == "failed"
+    assert "Looking up titles on MAL failed" in view["error"]
+
+
+def test_choose_that_hits_a_resolution_error_marks_failed_without_raising():
+    class FlakySearcher:
+        def search(self, query):
+            if query == "b":
+                raise RuntimeError("boom")
+            return RESULTS["hellsing"]
+
+    def factory(titles):
+        return ImportSession(
+            titles, FakeNormalizer(), FlakySearcher(), run_in_background=lambda fn: fn()
+        )
+
+    client = TestClient(create_app(factory))
+    session_id = client.post("/api/sessions", json={"text": "hellsing\nb"}).json()["id"]
+    assert client.get(f"/api/sessions/{session_id}").json()["status"] == "question"
+
+    response = client.post(f"/api/sessions/{session_id}/discard")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+
+
+def test_view_includes_resolution_progress_while_preparing():
+    session = ImportSession(
+        ["a", "b"], FakeNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
+    )
+    session.start()
+    managed = ManagedSession(id="x", session=session, status="preparing")
+
+    view = managed.view()
+
+    assert view.resolution is not None
+    assert (view.resolution.done, view.resolution.total) == (2, 2)
