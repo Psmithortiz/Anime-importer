@@ -43,8 +43,16 @@
           <a id="question-google" target="_blank" rel="noopener">Buscar en Google</a>
         </p>
         <div id="options"></div>
+        <p id="question-help" class="muted small" hidden>
+          Clic o 1-9 para marcar · Enter para confirmar · X para descartar
+        </p>
         <p id="question-error" class="error" hidden></p>
-        <button id="discard-btn" class="danger" type="button">Descartar (X)</button>
+        <div class="row">
+          <button id="confirm-btn" class="primary" type="button" hidden disabled>
+            Confirmar selección (Enter)
+          </button>
+          <button id="discard-btn" class="danger" type="button">Descartar (X)</button>
+        </div>
       </section>
 
       <!-- 4. Terminado -->
@@ -52,7 +60,15 @@
         <h1>Importación terminada</h1>
         <p id="imported-count"></p>
         <p id="rejected-count"></p>
+        <ul id="status-counts" class="status-counts"></ul>
         <div id="rejected-table"></div>
+        <label class="overwrite">
+          <input id="overwrite-checkbox" type="checkbox" />
+          Sobrescribir entradas que ya tengo en MAL
+        </label>
+        <p class="muted small">
+          Si está desmarcado, MAL solo agrega lo que falta y no toca tu lista actual.
+        </p>
         <div class="row">
           <a id="download-link" class="button primary" download="anime_import.xml">Descargar XML</a>
           <button class="new-import" type="button">Nueva importación</button>

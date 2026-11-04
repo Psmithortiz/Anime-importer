@@ -13,6 +13,8 @@ let sessionId = null;
 let currentView = null;
 let pollTimer = null;
 let busy = false;
+// Selección múltiple de la pregunta actual: número de opción -> estado de lista.
+const selection = new Map();
 
 // ---------------------------------------------------------------- API
 
@@ -132,8 +134,13 @@ function renderNormalizing(view) {
 
 function renderQuestion(view) {
   const { question, progress } = view;
+  selection.clear();
   setBusy(false);
   $("question-error").hidden = true;
+  const isCandidate = question.kind === "candidate";
+  $("confirm-btn").hidden = !isCandidate;
+  $("question-help").hidden = !isCandidate;
+  updateConfirm();
 
   const percent = progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
   $("progress-fill").style.width = `${percent}%`;
@@ -151,7 +158,7 @@ function renderQuestion(view) {
 
   const container = $("options");
   container.replaceChildren(
-    question.kind === "candidate" ? buildCards(question.options) : buildOptionList(question.options),
+    isCandidate ? buildCards(question.options) : buildOptionList(question.options),
   );
   showScreen("question");
 }
@@ -205,18 +212,79 @@ function buildMetaLine(option) {
   return line;
 }
 
+const LIST_STATUS_LABELS = {
+  completed: "Completado",
+  watching: "Viendo",
+  plan_to_watch: "Planeo ver",
+  on_hold: "En pausa",
+  dropped: "Abandonado",
+};
+
+function buildStatusSelect(option) {
+  const select = el("select", { attrs: { "aria-label": `Estado de ${option.label}` } });
+  for (const [value, label] of Object.entries(LIST_STATUS_LABELS)) {
+    select.append(el("option", { text: label, attrs: { value } }));
+  }
+  // Clics y teclas dentro del select no deben marcar la tarjeta ni disparar atajos.
+  for (const type of ["click", "keydown"]) {
+    select.addEventListener(type, (event) => event.stopPropagation());
+  }
+  select.addEventListener("change", () => selection.set(option.number, select.value));
+  return select;
+}
+
+function toggleSelection(option) {
+  if (busy) return;
+  const card = document.querySelector(`.card[data-number="${option.number}"]`);
+  if (!card) return;
+  const select = card.querySelector("select");
+  if (selection.has(option.number)) {
+    selection.delete(option.number);
+    card.classList.remove("selected");
+    select.hidden = true;
+  } else {
+    const status = option.suggested_status || "completed";
+    selection.set(option.number, status);
+    select.value = status;
+    card.classList.add("selected");
+    select.hidden = false;
+  }
+  card.setAttribute("aria-pressed", String(selection.has(option.number)));
+  updateConfirm();
+}
+
+function updateConfirm() {
+  const button = $("confirm-btn");
+  button.textContent = selection.size > 0
+    ? `Confirmar selección (${selection.size}) (Enter)`
+    : "Confirmar selección (Enter)";
+  button.disabled = busy || selection.size === 0;
+}
+
 function buildCards(options) {
   const grid = el("div", { className: "cards" });
   for (const option of options) {
-    const card = el("div", { className: "card" }, [
+    const select = buildStatusSelect(option);
+    select.hidden = true;
+    const card = el("div", { className: "card", attrs: { "data-number": String(option.number) } }, [
       buildPoster(option),
       el("span", { text: String(option.number), className: "badge" }),
       el("div", { text: option.label, className: "card-label" }),
       buildMetaLine(option),
       el("div", { text: `MAL id ${option.mal_id}`, className: "card-meta" }),
       externalLink("Ver en MAL", `https://myanimelist.net/anime/${encodeURIComponent(option.mal_id)}`),
+      select,
     ]);
-    makeActivatable(card, () => submit(() => choose(option.number)));
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-pressed", "false");
+    card.addEventListener("click", () => toggleSelection(option));
+    card.addEventListener("keydown", (event) => {
+      if (event.target === card && event.key === " ") {
+        event.preventDefault();
+        toggleSelection(option);
+      }
+    });
     grid.append(card);
   }
   return grid;
@@ -241,6 +309,14 @@ function renderFinished(view) {
   $("imported-count").textContent = `Importados: ${summary.imported}`;
   $("rejected-count").textContent = `Rechazados: ${summary.rejected.length}`;
 
+  const counts = [];
+  for (const [status, label] of Object.entries(LIST_STATUS_LABELS)) {
+    const count = (summary.by_status || {})[status] || 0;
+    if (count > 0) counts.push(el("li", { text: `${label}: ${count}` }));
+  }
+  $("status-counts").replaceChildren(...counts);
+  $("overwrite-checkbox").checked = false;
+
   const holder = $("rejected-table");
   if (summary.rejected.length === 0) {
     holder.replaceChildren();
@@ -253,8 +329,14 @@ function renderFinished(view) {
       el("table", {}, [el("thead", {}, [head]), el("tbody", {}, rows)]),
     );
   }
-  $("download-link").href = `/api/sessions/${encodeURIComponent(view.id)}/export.xml`;
+  updateDownloadLink();
   showScreen("finished");
+}
+
+function updateDownloadLink() {
+  const overwrite = $("overwrite-checkbox").checked;
+  $("download-link").href =
+    `/api/sessions/${encodeURIComponent(currentView.id)}/export.xml?overwrite=${overwrite}`;
 }
 
 function renderFailed(view) {
@@ -268,6 +350,8 @@ function setBusy(flag) {
   busy = flag;
   $("screen-question").classList.toggle("busy", flag);
   $("discard-btn").disabled = flag;
+  for (const select of document.querySelectorAll("#options select")) select.disabled = flag;
+  updateConfirm();
 }
 
 // Ejecuta una acción choose/discard bloqueando la UI y los atajos mientras está en curso.
@@ -287,6 +371,18 @@ async function submit(action) {
 
 function choose(number) {
   return api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/choose`, { option: number });
+}
+
+function chooseMany() {
+  const selections = [...selection.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([option, status]) => ({ option, status }));
+  return api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/choose-many`, { selections });
+}
+
+function confirmSelection() {
+  if (selection.size === 0) return;
+  submit(chooseMany);
 }
 
 function discard() {
@@ -334,19 +430,28 @@ function onKeydown(event) {
   if (busy || !currentView || currentView.status !== "question") return;
   if (event.ctrlKey || event.metaKey || event.altKey) return;
   const target = event.target;
-  if (target instanceof HTMLElement && target.matches("input, textarea")) return;
+  if (target instanceof HTMLElement && target.matches("input, textarea, select")) return;
 
   if (event.key === "x" || event.key === "X") {
     event.preventDefault();
     submit(discard);
     return;
   }
+  const { question } = currentView;
+  if (event.key === "Enter" && question.kind === "candidate") {
+    // Si el foco está en un botón o link, Enter conserva su acción nativa.
+    if (target instanceof HTMLElement && target.matches("button, a")) return;
+    event.preventDefault();
+    confirmSelection();
+    return;
+  }
   if (/^[1-9]$/.test(event.key)) {
     const number = Number(event.key);
-    if (currentView.question.options.some((option) => option.number === number)) {
-      event.preventDefault();
-      submit(() => choose(number));
-    }
+    const option = question.options.find((item) => item.number === number);
+    if (!option) return;
+    event.preventDefault();
+    if (question.kind === "candidate") toggleSelection(option);
+    else submit(() => choose(number));
   }
 }
 
@@ -368,6 +473,8 @@ async function init() {
   });
   $("start-btn").addEventListener("click", startImport);
   $("discard-btn").addEventListener("click", () => submit(discard));
+  $("confirm-btn").addEventListener("click", confirmSelection);
+  $("overwrite-checkbox").addEventListener("change", updateDownloadLink);
   for (const button of document.querySelectorAll(".new-import")) {
     button.addEventListener("click", goToStart);
   }
