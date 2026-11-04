@@ -65,6 +65,29 @@ def test_sanitize_query_replaces_symbols_with_spaces():
     )
 
 
+def test_sanitize_query_does_not_cut_words_in_half():
+    query = "Akujiki Reijou to Kyouketsu Koushaku: Sono Mamono, Watashi ga Oishiku Itadakimasu!"
+
+    assert sanitize_query(query) == "Akujiki Reijou to Kyouketsu Koushaku Sono Mamono Watashi ga"
+
+
+def test_sanitize_query_keeps_word_that_ends_exactly_at_the_limit():
+    query = "a" * 30 + " " + "b" * 33 + " " + "cccc"  # 64th char ends "b...", 65th is a space
+
+    result = sanitize_query(query)
+
+    assert result == "a" * 30 + " " + "b" * 33
+    assert len(result) == 64
+
+
+def test_sanitize_query_trims_a_single_very_long_word():
+    assert sanitize_query("x" * 100) == "x" * 64
+
+
+def test_sanitize_query_short_text_is_unchanged():
+    assert sanitize_query("Cowboy Bebop") == "Cowboy Bebop"
+
+
 def test_sanitize_query_truncates_without_trailing_space():
     result = sanitize_query("abcdefg " * 10)
     assert len(result) <= 64

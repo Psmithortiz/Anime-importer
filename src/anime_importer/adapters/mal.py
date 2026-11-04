@@ -22,9 +22,18 @@ _UNSAFE_CHARS = re.compile(r"[^a-zA-Z0-9 ]")
 
 
 def sanitize_query(query: str) -> str:
+    """Strip unsafe characters and fit MAL's query limit without cutting a word in half.
+
+    MAL requires every word to match, so a word cut in half returns no results.
+    """
     spaced = _UNSAFE_CHARS.sub(" ", query)
     collapsed = " ".join(spaced.split())
-    return collapsed[:_MAX_QUERY_LENGTH].strip()
+    if len(collapsed) <= _MAX_QUERY_LENGTH:
+        return collapsed
+    cut = collapsed[:_MAX_QUERY_LENGTH]
+    if collapsed[_MAX_QUERY_LENGTH] == " ":
+        return cut
+    return cut.rsplit(" ", 1)[0]
 
 
 _MEDIA_TYPES = {
