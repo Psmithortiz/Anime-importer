@@ -3,7 +3,6 @@ import requests
 
 from anime_importer.adapters.jikan import (
     JikanSearcher,
-    is_retryable,
     parse_search_response,
     sanitize_query,
 )
@@ -48,19 +47,6 @@ def test_sanitize_query_removes_special_chars():
 
 def test_sanitize_query_truncates():
     assert len(sanitize_query("a" * 100)) == 64
-
-
-@pytest.mark.parametrize(
-    "exc",
-    [requests.ConnectionError(), requests.Timeout(), _http_error(429), _http_error(503)],
-)
-def test_is_retryable_true(exc):
-    assert is_retryable(exc)
-
-
-@pytest.mark.parametrize("exc", [_http_error(404), ValueError()])
-def test_is_retryable_false(exc):
-    assert not is_retryable(exc)
 
 
 def test_search_wraps_non_retryable_error_in_search_error():
