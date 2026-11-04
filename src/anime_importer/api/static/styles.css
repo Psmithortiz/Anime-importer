@@ -396,8 +396,63 @@ th {
   font-weight: 600;
 }
 
+/* With a franchise, candidate cards have a fixed width so the column fits its content. */
+.has-franchise .cards {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.has-franchise .cards > .card {
+  flex: 0 0 clamp(160px, 14vw, 260px);
+}
+
 @media (min-width: 900px) {
   .question-layout.has-franchise {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-columns: fit-content(60%) minmax(0, 1fr);
+  }
+}
+
+/* Actions: always visible. Narrow screens: sticky bar at the bottom of the question. */
+.actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin-top: 1rem;
+  padding: 0.5rem 0 0.75rem;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -0.5rem 0.75rem -0.25rem rgba(0, 0, 0, 0.5);
+}
+
+.actions p {
+  margin: 0.25rem 0;
+}
+
+.actions .row {
+  margin: 0.5rem 0 0;
+}
+
+.actions .danger {
+  margin-top: 0;
+}
+
+/* Wide screens: fixed panel in the free space to the left of the centered container. */
+@media (min-width: 1920px) {
+  .actions {
+    position: fixed;
+    left: 0.75rem;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    width: 10.5rem;
+    padding: 0;
+    background: transparent;
+    border-top: 0;
+    box-shadow: none;
+  }
+
+  .actions .row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
