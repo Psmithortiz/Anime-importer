@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from anime_importer.domain.models import NormalizedTitle
-from anime_importer.ports import ChunkedNormalizer
+from anime_importer.ports import ChunkedNormalizer, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +76,21 @@ class CachingNormalizer:
         self._inner = inner
         self._store = store
 
-    def normalize(self, titles: list[str] | tuple[str, ...]) -> list[NormalizedTitle]:
+    def normalize(
+        self,
+        titles: list[str] | tuple[str, ...],
+        on_progress: ProgressCallback | None = None,
+    ) -> list[NormalizedTitle]:
         cached = self._store.get_all()
         keys = [cache_key(title) for title in titles]
+
+        def report() -> None:
+            # Counts positions of the full list (not unique keys); the inner normalizer
+            # only sees the missing titles, so this wrapper reports the overall progress.
+            if on_progress is not None:
+                on_progress(sum(1 for key in keys if key in cached), len(titles))
+
+        report()
 
         missing: list[str] = []
         seen: set[str] = set()
@@ -104,6 +116,7 @@ class CachingNormalizer:
                 }
                 self._store.put_many(entries)
                 cached.update(entries)
+                report()
 
             self._inner.normalize(missing, on_chunk=on_chunk)
 

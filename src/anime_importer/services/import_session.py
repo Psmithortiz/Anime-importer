@@ -66,6 +66,7 @@ class ImportSession:
         self._imported: list[ImportedAnime] = []
         self._rejected: list[RejectedTitle] = []
         self._current: Step | None = None
+        self._normalization_progress: tuple[int, int] | None = None
 
     @property
     def current(self) -> Step:
@@ -78,6 +79,14 @@ class ImportSession:
         """(resolved titles, total)."""
         return self._position, len(self._titles)
 
+    @property
+    def normalization_progress(self) -> tuple[int, int] | None:
+        """(normalized titles, total) reported by the normalizer, or None if it has not reported."""
+        return self._normalization_progress
+
+    def _set_normalization_progress(self, done: int, total: int) -> None:
+        self._normalization_progress = (done, total)
+
     def start(self) -> Step:
         """Normalize the whole list and advance to the first question.
 
@@ -85,7 +94,9 @@ class ImportSession:
         """
         if self._current is not None:
             raise RuntimeError("The session has already started")
-        normalized = self._normalizer.normalize(self._titles)
+        normalized = self._normalizer.normalize(
+            self._titles, on_progress=self._set_normalization_progress
+        )
         self._normalized = {t.index: t for t in normalized}
         return self._advance()
 

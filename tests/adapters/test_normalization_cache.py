@@ -14,17 +14,18 @@ from anime_importer.ports import NormalizationError
 
 
 class FakeInner:
-    """Fake normalizer that simulates chunks of 2 and records which titles it was called with."""
+    """Fake normalizer that simulates chunks and records which titles it was called with."""
 
-    def __init__(self, fail_after_first_chunk: bool = False) -> None:
+    def __init__(self, fail_after_first_chunk: bool = False, chunk_size: int = 2) -> None:
         self.calls: list[list[str]] = []
         self._fail = fail_after_first_chunk
+        self._chunk_size = chunk_size
 
-    def normalize(self, titles, on_chunk=None):
+    def normalize(self, titles, on_chunk=None, on_progress=None):
         self.calls.append(list(titles))
         results = []
-        for start in range(0, len(titles), 2):
-            chunk = titles[start : start + 2]
+        for start in range(0, len(titles), self._chunk_size):
+            chunk = titles[start : start + self._chunk_size]
             chunk_results = [
                 NormalizedTitle(i, f"R:{title}") for i, title in enumerate(chunk, start=1)
             ]
@@ -121,6 +122,27 @@ def test_put_many_is_atomic_and_leaves_no_tmp(tmp_path):
 
 def test_missing_file_is_empty(tmp_path):
     assert JsonCacheStore(tmp_path / "nope.json").get_all() == {}
+
+
+def test_progress_counts_cached_titles_then_each_chunk(tmp_path):
+    normalizer, _, store = _normalizer(tmp_path, FakeInner(chunk_size=1))
+    store.put_many({"a": NormalizedTitle(0, "R:a"), "b": NormalizedTitle(0, "R:b")})
+    progress: list[tuple[int, int]] = []
+
+    normalizer.normalize(["a", "b", "c", "d"], on_progress=lambda *args: progress.append(args))
+
+    assert progress == [(2, 4), (3, 4), (4, 4)]
+
+
+def test_progress_with_everything_cached_reports_once_and_skips_inner(tmp_path):
+    normalizer, inner, store = _normalizer(tmp_path)
+    store.put_many({key: NormalizedTitle(0, f"R:{key}") for key in "abcd"})
+    progress: list[tuple[int, int]] = []
+
+    normalizer.normalize(["a", "b", "c", "d"], on_progress=lambda *args: progress.append(args))
+
+    assert progress == [(4, 4)]
+    assert inner.calls == []
 
 
 def test_cache_version_depends_on_model_and_is_stable():

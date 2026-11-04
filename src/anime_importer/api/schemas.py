@@ -69,6 +69,7 @@ class SessionView(BaseModel):
     id: str
     status: SessionStatus
     progress: ProgressOut
+    normalization: ProgressOut | None = None
     error: str | None = None
     question: QuestionOut | None = None
     summary: SummaryOut | None = None

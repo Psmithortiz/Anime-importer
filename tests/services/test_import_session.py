@@ -20,7 +20,7 @@ class FakeNormalizer:
     def __init__(self, normalized: list[NormalizedTitle]) -> None:
         self._normalized = normalized
 
-    def normalize(self, titles):
+    def normalize(self, titles, on_progress=None):
         return self._normalized
 
 
@@ -35,6 +35,23 @@ class FakeSearcher:
         if isinstance(result, Exception):
             raise result
         return result
+
+
+class ProgressNormalizer:
+    def normalize(self, titles, on_progress=None):
+        if on_progress is not None:
+            on_progress(1, len(titles))
+            on_progress(len(titles), len(titles))
+        return [NormalizedTitle(i, title) for i, title in enumerate(titles, start=1)]
+
+
+def test_exposes_normalization_progress_after_start():
+    session = ImportSession(["a", "b"], ProgressNormalizer(), FakeSearcher({}))
+    assert session.normalization_progress is None
+
+    session.start()
+
+    assert session.normalization_progress == (2, 2)
 
 
 def _session(titles, normalized, results):

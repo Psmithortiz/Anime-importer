@@ -128,7 +128,18 @@ function render(view) {
 }
 
 function renderNormalizing(view) {
-  $("normalizing-msg").textContent = `Normalizing ${view.progress.total} titles with Gemini…`;
+  const reported = view.normalization;
+  const bar = $("normalizing-bar");
+  if (reported) {
+    $("normalizing-msg").textContent =
+      `Normalizing with Gemini… ${reported.done} / ${reported.total} titles`;
+    const percent = reported.total > 0 ? (reported.done / reported.total) * 100 : 0;
+    $("normalizing-fill").style.width = `${percent}%`;
+    bar.hidden = false;
+  } else {
+    $("normalizing-msg").textContent = `Normalizing ${view.progress.total} titles with Gemini…`;
+    bar.hidden = true;
+  }
   showScreen("normalizing");
 }
 

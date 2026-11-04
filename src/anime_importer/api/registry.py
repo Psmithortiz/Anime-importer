@@ -78,7 +78,12 @@ class ManagedSession:
         done, total = self.session.progress
         question = None
         summary = None
-        if status == "question":
+        normalization = None
+        if status == "normalizing":
+            reported = self.session.normalization_progress  # tuple read: atomic snapshot
+            if reported is not None:
+                normalization = ProgressOut(done=reported[0], total=reported[1])
+        elif status == "question":
             step = self.session.current
             if not isinstance(step, Finished):
                 question = question_out(step)
@@ -97,6 +102,7 @@ class ManagedSession:
             id=self.id,
             status=status,
             progress=ProgressOut(done=done, total=total),
+            normalization=normalization,
             error=self.error,
             question=question,
             summary=summary,

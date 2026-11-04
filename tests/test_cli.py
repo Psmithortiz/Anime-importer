@@ -9,7 +9,7 @@ from anime_importer.services.import_session import CandidateChoice, Finished, Im
 
 
 class FakeNormalizer:
-    def normalize(self, titles):
+    def normalize(self, titles, on_progress=None):
         return [NormalizedTitle(1, "Hellsing")]
 
 
@@ -91,7 +91,7 @@ def test_main_empty_input_returns_1_without_writing_files(monkeypatch, tmp_path)
 
 
 class _AutoNormalizer:
-    def normalize(self, titles):
+    def normalize(self, titles, on_progress=None):
         return [NormalizedTitle(1, "Naruto")]
 
 

@@ -16,7 +16,7 @@ from tenacity import (
 )
 
 from anime_importer.domain.models import NormalizedTitle
-from anime_importer.ports import ChunkCallback, NormalizationError
+from anime_importer.ports import ChunkCallback, NormalizationError, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,10 @@ class GeminiNormalizer:
         self._sleep = sleep
 
     def normalize(
-        self, titles: Sequence[str], on_chunk: ChunkCallback | None = None
+        self,
+        titles: Sequence[str],
+        on_chunk: ChunkCallback | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> list[NormalizedTitle]:
         size = self._chunk_size
         chunks = [titles[i : i + size] for i in range(0, len(titles), size)]
@@ -133,6 +136,8 @@ class GeminiNormalizer:
             if on_chunk is not None:
                 on_chunk(chunk, chunk_results)
             results.extend(replace(t, index=t.index + offset) for t in chunk_results)
+            if on_progress is not None:
+                on_progress(offset + len(chunk), len(titles))
             if number < len(chunks):
                 self._sleep(self._sleep_seconds)
         return results

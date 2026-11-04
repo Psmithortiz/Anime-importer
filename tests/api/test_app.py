@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from anime_importer.api.app import create_app
+from anime_importer.api.registry import ManagedSession
 from anime_importer.domain.models import AiringStatus, AnimeCandidate, MediaType, NormalizedTitle
 from anime_importer.ports import NormalizationError
 from anime_importer.services.import_session import ImportSession
@@ -22,12 +23,12 @@ RESULTS = {
 
 
 class FakeNormalizer:
-    def normalize(self, titles):
+    def normalize(self, titles, on_progress=None):
         return [NormalizedTitle(i, title) for i, title in enumerate(titles, start=1)]
 
 
 class FailingNormalizer:
-    def normalize(self, titles):
+    def normalize(self, titles, on_progress=None):
         raise NormalizationError("Gemini is not responding")
 
 
@@ -270,3 +271,32 @@ def test_export_overwrite_flag():
 
     assert "<update_on_import>0</update_on_import>" in default.text
     assert "<update_on_import>1</update_on_import>" in forced.text
+
+
+class ProgressNormalizer:
+    def normalize(self, titles, on_progress=None):
+        if on_progress is not None:
+            on_progress(len(titles), len(titles))
+        return [NormalizedTitle(i, title) for i, title in enumerate(titles, start=1)]
+
+
+def test_final_view_has_no_normalization_progress():
+    client = _client(ProgressNormalizer())
+    session_id = _create(client)
+
+    view = client.get(f"/api/sessions/{session_id}").json()
+
+    assert view["status"] == "question"
+    assert view["normalization"] is None
+
+
+def test_view_includes_normalization_progress_while_normalizing():
+    session = ImportSession(["a", "b", "c"], ProgressNormalizer(), FakeSearcher())
+    session.start()  # reports (3, 3)
+    managed = ManagedSession(id="x", session=session, status="normalizing")
+
+    view = managed.view()
+
+    assert view.status == "normalizing"
+    assert view.normalization is not None
+    assert (view.normalization.done, view.normalization.total) == (3, 3)
