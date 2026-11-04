@@ -169,12 +169,6 @@ function renderQuestion(view) {
   container.replaceChildren(
     isCandidate ? buildCandidateLayout(question) : buildOptionList(question.options),
   );
-  if (isCandidate) {
-    const preselected = new Set(question.preselected || []);
-    for (const item of [...question.options, ...(question.franchise || [])]) {
-      if (preselected.has(item.mal_id)) setSelected(item, true);
-    }
-  }
   showScreen("question");
 }
 
@@ -213,13 +207,14 @@ const MEDIA_TYPE_LABELS = {
 
 const STATUS_LABELS = { airing: "Airing", not_yet_aired: "Not yet aired" };
 
-function buildMetaLine(option) {
+function buildMetaLine(option, bestMatch = false) {
   const parts = [];
   if (option.media_type) parts.push(MEDIA_TYPE_LABELS[option.media_type] || option.media_type);
   if (option.year) parts.push(String(option.year));
   if (option.episodes) parts.push(`${option.episodes} eps`);
   const line = el("div", { className: "card-meta" });
   if (parts.length > 0) line.append(el("span", { text: parts.join(" · ") }));
+  if (bestMatch) line.append(el("span", { text: "Best match", className: "tag tag-best" }));
   const statusText = STATUS_LABELS[option.airing_status];
   if (statusText) {
     line.append(el("span", { text: statusText, className: `tag tag-${option.airing_status}` }));
@@ -296,7 +291,7 @@ function malLink(item) {
   return externalLink("View on MAL", `https://myanimelist.net/anime/${encodeURIComponent(item.mal_id)}`);
 }
 
-function buildCards(options) {
+function buildCards(options, bestMatchIds = new Set()) {
   const grid = el("div", { className: "cards" });
   for (const option of options) {
     const select = buildStatusSelect(option);
@@ -305,7 +300,7 @@ function buildCards(options) {
       buildPoster(option),
       el("span", { text: String(option.number), className: "badge" }),
       el("div", { text: option.label, className: "card-label" }),
-      buildMetaLine(option),
+      buildMetaLine(option, bestMatchIds.has(option.mal_id)),
       el("div", { text: `MAL id ${option.mal_id}`, className: "card-meta" }),
       malLink(option),
       select,
@@ -367,7 +362,9 @@ function buildFranchiseColumn(question) {
 
 function buildCandidateLayout(question) {
   const layout = el("div", { className: "question-layout" }, [
-    el("div", { className: "candidates" }, [buildCards(question.options)]),
+    el("div", { className: "candidates" }, [
+      buildCards(question.options, new Set(question.preselected || [])),
+    ]),
   ]);
   if ((question.franchise || []).length > 0) {
     layout.classList.add("has-franchise");
