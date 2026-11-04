@@ -1,4 +1,4 @@
-"""Piezas HTTP compartidas por los adaptadores de búsqueda."""
+"""HTTP pieces shared by the search adapters."""
 
 import logging
 import time
@@ -35,7 +35,7 @@ http_retry = retry(
 
 
 class Throttle:
-    """Garantiza un intervalo mínimo entre llamadas a wait()."""
+    """Guarantee a minimum interval between calls to wait()."""
 
     def __init__(
         self,

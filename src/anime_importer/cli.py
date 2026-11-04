@@ -22,32 +22,30 @@ logger = logging.getLogger(__name__)
 def describe_question(step: NormalizationChoice | CandidateChoice) -> str:
     lines = ["", "-" * 50]
     if isinstance(step, NormalizationChoice):
-        lines.append(f'¿Qué quisiste decir con "{step.original_title}"? (LLM preguntando)')
+        lines.append(f'What did you mean by "{step.original_title}"? (LLM asking)')
         labels = list(step.options)
     else:
-        lines.append(
-            f'¿Qué quisiste decir con "{step.original_title}"/"{step.query}"? (MAL preguntando)'
-        )
+        lines.append(f'What did you mean by "{step.original_title}"/"{step.query}"? (MAL asking)')
         labels = [f"{c.title} (MAL id {c.mal_id})" for c in step.options]
     lines.extend(f"({number})- {label}" for number, label in enumerate(labels, start=1))
-    lines.append("(X)  Descartar")
+    lines.append("(X)  Discard")
     return "\n".join(lines)
 
 
 def ask_option(count: int, read: Callable[[str], str] = input) -> int | None:
-    """Pide una opción entre 1 y `count`. Devuelve None si el usuario descarta con X."""
+    """Ask for an option between 1 and `count`. Return None if the user discards with X."""
     while True:
-        raw = read(f"Ingresa el número de opción (1-{count}) o X: ").strip()
+        raw = read(f"Enter the option number (1-{count}) or X: ").strip()
         if raw.upper() == "X":
             return None
         try:
             number = int(raw)
         except ValueError:
-            print("No es un número. Intenta de nuevo.")
+            print("Not a number. Try again.")
             continue
         if 1 <= number <= count:
             return number
-        print("Fuera de rango. Intenta de nuevo.")
+        print("Out of range. Try again.")
 
 
 def run_interactive(session: ImportSession, read: Callable[[str], str] = input) -> Finished:
@@ -60,14 +58,14 @@ def run_interactive(session: ImportSession, read: Callable[[str], str] = input) 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Importa una lista de anime a MyAnimeList.")
-    parser.add_argument("--input", type=Path, help="Lista de títulos (uno por línea)")
-    parser.add_argument("--output", type=Path, help="Ruta del XML para MAL")
-    parser.add_argument("--rejected", type=Path, help="Ruta del reporte de errores")
+    parser = argparse.ArgumentParser(description="Import an anime list into MyAnimeList.")
+    parser.add_argument("--input", type=Path, help="List of titles (one per line)")
+    parser.add_argument("--output", type=Path, help="Path of the MAL XML output")
+    parser.add_argument("--rejected", type=Path, help="Path of the rejected-titles report")
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Sobrescribir entradas que ya existan en tu lista de MAL (update_on_import)",
+        help="Overwrite entries that already exist in your MAL list (update_on_import)",
     )
     args = parser.parse_args(argv)
 
@@ -92,7 +90,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     write_mal_xml(finished.imported, output_path, update_on_import=args.overwrite)
     write_rejected_report(finished.rejected, rejected_path)
     print(
-        f"\nImportados: {len(finished.imported)} | Rechazados: {len(finished.rejected)}"
-        f"\nXML: {output_path} | Errores: {rejected_path}"
+        f"\nImported: {len(finished.imported)} | Rejected: {len(finished.rejected)}"
+        f"\nXML: {output_path} | Rejected: {rejected_path}"
     )
     return 0

@@ -11,7 +11,7 @@ MAX_OPTIONS = 5
 
 @dataclass(frozen=True, slots=True)
 class MatchResult:
-    """Si `accepted` no es None, el match es automático. Si no, `options` va al menú."""
+    """If `accepted` is not None, the match is automatic. Otherwise `options` goes to the menu."""
 
     accepted: AnimeCandidate | None
     options: tuple[AnimeCandidate, ...] = ()

@@ -27,7 +27,7 @@ def _to_dict(item: NormalizedTitle) -> dict[str, Any]:
 
 def _from_dict(data: dict[str, Any]) -> NormalizedTitle:
     return NormalizedTitle(
-        index=0,  # provisorio: el índice depende de la lista que se esté procesando
+        index=0,  # provisional: the index depends on the list being processed
         romaji=data["romaji"],
         is_anime=data["is_anime"],
         ambiguous=data["ambiguous"],
@@ -36,7 +36,7 @@ def _from_dict(data: dict[str, Any]) -> NormalizedTitle:
 
 
 class JsonCacheStore:
-    """Caché en un archivo JSON {clave: datos de normalización}, con escritura atómica."""
+    """Cache in a JSON file {key: normalization data}, with atomic writes."""
 
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -65,12 +65,12 @@ class JsonCacheStore:
             data = json.loads(raw)
             return {key: _from_dict(value) for key, value in data.items()}
         except (ValueError, KeyError, TypeError, AttributeError):
-            logger.warning("Caché de normalización corrupto, se ignora: %s", self._path)
+            logger.warning("Corrupt normalization cache, ignoring it: %s", self._path)
             return {}
 
 
 class CachingNormalizer:
-    """Evita volver a pedir al normalizador títulos que ya normalizó (por título, no por lista)."""
+    """Avoid asking the normalizer again for titles it already normalized (per title, not per list)."""
 
     def __init__(self, inner: ChunkedNormalizer, store: JsonCacheStore) -> None:
         self._inner = inner
@@ -88,7 +88,7 @@ class CachingNormalizer:
                 missing.append(title)
 
         logger.info(
-            "Normalización: %d títulos, %d del caché, %d a pedir",
+            "Normalization: %d titles, %d from cache, %d to request",
             len(titles),
             len(set(keys)) - len(missing),
             len(missing),

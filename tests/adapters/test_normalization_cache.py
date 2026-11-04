@@ -14,7 +14,7 @@ from anime_importer.ports import NormalizationError
 
 
 class FakeInner:
-    """Normalizador falso que simula chunks de 2 y registra con qué títulos lo llamaron."""
+    """Fake normalizer that simulates chunks of 2 and records which titles it was called with."""
 
     def __init__(self, fail_after_first_chunk: bool = False) -> None:
         self.calls: list[list[str]] = []

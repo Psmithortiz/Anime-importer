@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,30 +8,30 @@
   </head>
   <body>
     <main>
-      <!-- 1. Inicio -->
+      <!-- 1. Start -->
       <section id="screen-start" hidden>
         <h1>Anime Importer</h1>
-        <p class="muted">Pega tu lista de anime (un título por línea) o carga un archivo .txt.</p>
+        <p class="muted">Paste your anime list (one title per line) or load a .txt file.</p>
         <textarea id="titles-input" rows="14" placeholder="Naruto&#10;Hellsing&#10;..."></textarea>
         <div class="row">
           <input id="file-input" type="file" accept=".txt,text/plain" />
-          <span id="line-count" class="muted">0 títulos</span>
+          <span id="line-count" class="muted">0 titles</span>
         </div>
         <p id="start-error" class="error" hidden></p>
-        <button id="start-btn" class="primary" type="button" disabled>Empezar importación</button>
+        <button id="start-btn" class="primary" type="button" disabled>Start import</button>
       </section>
 
-      <!-- 2. Normalizando -->
+      <!-- 2. Normalizing -->
       <section id="screen-normalizing" hidden>
         <h1>Anime Importer</h1>
         <div class="spinner" aria-hidden="true"></div>
         <p id="normalizing-msg" class="center"></p>
         <p id="poll-warning" class="warning center" hidden>
-          Sin conexión con el servidor. Reintentando…
+          Can't reach the server. Retrying…
         </p>
       </section>
 
-      <!-- 3. Pregunta -->
+      <!-- 3. Question -->
       <section id="screen-question" hidden>
         <div class="progress">
           <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
@@ -40,46 +40,46 @@
         <h2 id="question-title"></h2>
         <p class="muted">
           <span id="question-query" hidden></span>
-          <a id="question-google" target="_blank" rel="noopener">Buscar en Google</a>
+          <a id="question-google" target="_blank" rel="noopener">Search on Google</a>
         </p>
         <div id="options"></div>
         <p id="question-help" class="muted small" hidden>
-          Clic o 1-9 para marcar · Enter para confirmar · X para descartar
+          Click or 1-9 to select · Enter to confirm · X to discard
         </p>
         <p id="question-error" class="error" hidden></p>
         <div class="row">
           <button id="confirm-btn" class="primary" type="button" hidden disabled>
-            Confirmar selección (Enter)
+            Confirm selection (Enter)
           </button>
-          <button id="discard-btn" class="danger" type="button">Descartar (X)</button>
+          <button id="discard-btn" class="danger" type="button">Discard (X)</button>
         </div>
       </section>
 
-      <!-- 4. Terminado -->
+      <!-- 4. Finished -->
       <section id="screen-finished" hidden>
-        <h1>Importación terminada</h1>
+        <h1>Import finished</h1>
         <p id="imported-count"></p>
         <p id="rejected-count"></p>
         <ul id="status-counts" class="status-counts"></ul>
         <div id="rejected-table"></div>
         <label class="overwrite">
           <input id="overwrite-checkbox" type="checkbox" />
-          Sobrescribir entradas que ya tengo en MAL
+          Overwrite entries I already have on MAL
         </label>
         <p class="muted small">
-          Si está desmarcado, MAL solo agrega lo que falta y no toca tu lista actual.
+          If unchecked, MAL only adds what's missing and leaves your current list untouched.
         </p>
         <div class="row">
-          <a id="download-link" class="button primary" download="anime_import.xml">Descargar XML</a>
-          <button class="new-import" type="button">Nueva importación</button>
+          <a id="download-link" class="button primary" download="anime_import.xml">Download XML</a>
+          <button class="new-import" type="button">New import</button>
         </div>
       </section>
 
-      <!-- 5. Falló -->
+      <!-- 5. Failed -->
       <section id="screen-failed" hidden>
-        <h1>La importación falló</h1>
+        <h1>The import failed</h1>
         <p id="failed-msg" class="error"></p>
-        <button class="new-import" type="button">Nueva importación</button>
+        <button class="new-import" type="button">New import</button>
       </section>
     </main>
     <script src="/app.js"></script>

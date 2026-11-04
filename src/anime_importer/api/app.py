@@ -36,7 +36,7 @@ def get_managed(session_id: str, registry: RegistryDep) -> ManagedSession:
     try:
         return registry.get(session_id)
     except SessionNotFoundError:
-        raise HTTPException(status_code=404, detail="Sesión no encontrada") from None
+        raise HTTPException(status_code=404, detail="Session not found") from None
 
 
 ManagedDep = Annotated[ManagedSession, Depends(get_managed)]
@@ -58,8 +58,8 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
     )
     app.state.registry = SessionRegistry(session_factory)
 
-    # Todos los endpoints son `def` (no `async def`): llaman a código bloqueante y FastAPI
-    # los corre en un threadpool; con async def congelarían el event loop y el polling.
+    # All endpoints are `def` (not `async def`): they call blocking code and FastAPI
+    # runs them in a threadpool; with async def they would freeze the event loop and the polling.
     @app.post(
         "/api/sessions",
         status_code=202,
@@ -145,7 +145,7 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
             headers={"Content-Disposition": 'attachment; filename="anime_import.xml"'},
         )
 
-    # Se monta al final para que no tape las rutas /api.
+    # Mounted last so it does not shadow the /api routes.
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
 

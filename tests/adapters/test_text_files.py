@@ -8,7 +8,7 @@ from anime_importer.domain.models import RejectedTitle
 
 
 def test_read_titles_ignores_blank_lines_and_whitespace(tmp_path):
-    path = tmp_path / "lista.txt"
+    path = tmp_path / "list.txt"
     path.write_text("  Naruto  \n\n   \nBleach\nÑandú\n", encoding="utf-8")
 
     assert read_titles(path) == ["Naruto", "Bleach", "Ñandú"]
@@ -16,24 +16,21 @@ def test_read_titles_ignores_blank_lines_and_whitespace(tmp_path):
 
 def test_render_rejected_report():
     report = render_rejected_report(
-        [RejectedTitle("Foo", "no encontrado"), RejectedTitle("Bar", "sin coincidencia")]
+        [RejectedTitle("Foo", "not found"), RejectedTitle("Bar", "no match")]
     )
 
     assert report == (
-        "TITULO | MOTIVO DEL ERROR\n"
-        "------------------------------\n"
-        "Foo | no encontrado\n"
-        "Bar | sin coincidencia\n"
+        "TITLE | REASON\n------------------------------\nFoo | not found\nBar | no match\n"
     )
 
 
 def test_render_rejected_report_empty_has_only_header():
-    assert render_rejected_report([]) == "TITULO | MOTIVO DEL ERROR\n" + "-" * 30 + "\n"
+    assert render_rejected_report([]) == "TITLE | REASON\n" + "-" * 30 + "\n"
 
 
 def test_write_rejected_report(tmp_path):
     path = tmp_path / "bad.txt"
-    rejected = [RejectedTitle("Foo", "no encontrado")]
+    rejected = [RejectedTitle("Foo", "not found")]
     write_rejected_report(rejected, path)
 
     assert path.read_text(encoding="utf-8") == render_rejected_report(rejected)

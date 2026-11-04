@@ -67,7 +67,7 @@ def test_no_results_is_rejected():
 
     assert isinstance(step, Finished)
     assert step.imported == ()
-    assert [r.reason for r in step.rejected] == ["Sin resultados (query: Foo)"]
+    assert [r.reason for r in step.rejected] == ["No results (query: Foo)"]
     assert step.rejected[0].original_title == "x"
 
 
@@ -77,7 +77,7 @@ def test_search_error_is_rejected():
     step = session.start()
 
     assert isinstance(step, Finished)
-    assert [r.reason for r in step.rejected] == ["Error de búsqueda: boom"]
+    assert [r.reason for r in step.rejected] == ["Search error: boom"]
 
 
 def test_not_anime_is_rejected():
@@ -86,7 +86,7 @@ def test_not_anime_is_rejected():
     step = session.start()
 
     assert isinstance(step, Finished)
-    assert [r.reason for r in step.rejected] == ["No es un anime (según el normalizador)"]
+    assert [r.reason for r in step.rejected] == ["Not an anime (according to the normalizer)"]
 
 
 def test_missing_normalization_is_rejected():
@@ -95,7 +95,7 @@ def test_missing_normalization_is_rejected():
     step = session.start()
 
     assert isinstance(step, Finished)
-    assert [r.reason for r in step.rejected] == ["Sin datos de normalización"]
+    assert [r.reason for r in step.rejected] == ["No normalization data"]
 
 
 def test_tie_asks_user_and_choose_imports_selected_candidate():
@@ -167,7 +167,7 @@ def test_discard_normalization_choice():
     step = session.discard()
 
     assert isinstance(step, Finished)
-    assert [r.reason for r in step.rejected] == ["Descartado en menú de normalización"]
+    assert [r.reason for r in step.rejected] == ["Discarded in normalization menu"]
 
 
 def test_discard_candidate_choice():
@@ -179,7 +179,7 @@ def test_discard_candidate_choice():
     step = session.discard()
 
     assert isinstance(step, Finished)
-    assert [r.reason for r in step.rejected] == ["Descartado en menú de búsqueda (query: Hellsing)"]
+    assert [r.reason for r in step.rejected] == ["Discarded in search menu (query: Hellsing)"]
 
 
 def test_finished_rejected_sorted_by_reason():

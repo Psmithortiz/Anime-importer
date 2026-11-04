@@ -10,7 +10,7 @@ from anime_importer.services.import_session import ImportSession
 
 
 def build_session(settings: Settings, titles: Sequence[str]) -> ImportSession:
-    """Raíz de composición: el único lugar que decide qué adaptadores concretos se usan."""
+    """Composition root: the only place that decides which concrete adapters are used."""
     client = genai.Client(api_key=settings.gemini_api_key)
     gemini = GeminiNormalizer(
         client=client, model=settings.gemini_model, chunk_size=settings.gemini_chunk_size

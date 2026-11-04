@@ -1,7 +1,7 @@
 "use strict";
 
-// Todo texto que viene de la API se inserta con textContent / createElement.
-// Nunca se usa innerHTML con datos de la API (los títulos vienen de servicios externos).
+// All text coming from the API is inserted with textContent / createElement.
+// innerHTML is never used with API data (titles come from external services).
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -13,7 +13,7 @@ let sessionId = null;
 let currentView = null;
 let pollTimer = null;
 let busy = false;
-// Selección múltiple de la pregunta actual: número de opción -> estado de lista.
+// Multi-selection of the current question: option number -> list status.
 const selection = new Map();
 
 // ---------------------------------------------------------------- API
@@ -38,7 +38,7 @@ async function api(method, path, body) {
   try {
     response = await fetch(path, options);
   } catch {
-    throw new Error("No se pudo conectar con el servidor");
+    throw new Error("Could not connect to the server");
   }
   if (!response.ok) {
     let message = null;
@@ -46,16 +46,16 @@ async function api(method, path, body) {
       const data = await response.json();
       message = describeDetail(data.detail);
     } catch {
-      // cuerpo no JSON: se usa el mensaje genérico
+      // non-JSON body: the generic message is used
     }
-    const error = new Error(message || `Error del servidor (${response.status})`);
+    const error = new Error(message || `Server error (${response.status})`);
     error.status = response.status;
     throw error;
   }
   return response.json();
 }
 
-// ---------------------------------------------------------------- helpers de DOM
+// ---------------------------------------------------------------- DOM helpers
 
 function el(tag, { text, className, attrs } = {}, children = []) {
   const node = document.createElement(tag);
@@ -74,7 +74,7 @@ function googleUrl(title) {
 
 function externalLink(text, href, className = "small-link") {
   const link = el("a", { text, className, attrs: { href, target: "_blank", rel: "noopener" } });
-  // Abrir el link no debe elegir la tarjeta/fila que lo contiene.
+  // Opening the link must not select the card/row that contains it.
   link.addEventListener("click", (event) => event.stopPropagation());
   return link;
 }
@@ -101,7 +101,7 @@ function schedulePoll() {
     pollTimer = null;
     try {
       const view = await api("GET", `/api/sessions/${encodeURIComponent(polledId)}`);
-      if (polledId !== sessionId) return; // el usuario ya cambió de sesión
+      if (polledId !== sessionId) return; // the user has already switched session
       $("poll-warning").hidden = true;
       render(view);
     } catch {
@@ -128,7 +128,7 @@ function render(view) {
 }
 
 function renderNormalizing(view) {
-  $("normalizing-msg").textContent = `Normalizando ${view.progress.total} títulos con Gemini…`;
+  $("normalizing-msg").textContent = `Normalizing ${view.progress.total} titles with Gemini…`;
   showScreen("normalizing");
 }
 
@@ -149,7 +149,7 @@ function renderQuestion(view) {
   $("question-title").textContent = question.original_title;
   const query = $("question-query");
   if (question.kind === "candidate" && question.query) {
-    query.textContent = `Búsqueda: "${question.query}" · `;
+    query.textContent = `Search: "${question.query}" · `;
     query.hidden = false;
   } else {
     query.hidden = true;
@@ -176,7 +176,7 @@ function makeActivatable(node, handler) {
 }
 
 function buildPoster(option) {
-  const placeholder = () => el("div", { text: "Sin imagen", className: "poster poster-placeholder" });
+  const placeholder = () => el("div", { text: "No image", className: "poster poster-placeholder" });
   if (!option.image_url) return placeholder();
   const img = el("img", {
     className: "poster",
@@ -188,15 +188,15 @@ function buildPoster(option) {
 
 const MEDIA_TYPE_LABELS = {
   tv: "TV",
-  movie: "Película",
+  movie: "Movie",
   ova: "OVA",
   ona: "ONA",
-  special: "Especial",
-  music: "Música",
-  other: "Otro",
+  special: "Special",
+  music: "Music",
+  other: "Other",
 };
 
-const STATUS_LABELS = { airing: "En emisión", not_yet_aired: "Por estrenar" };
+const STATUS_LABELS = { airing: "Airing", not_yet_aired: "Not yet aired" };
 
 function buildMetaLine(option) {
   const parts = [];
@@ -213,19 +213,19 @@ function buildMetaLine(option) {
 }
 
 const LIST_STATUS_LABELS = {
-  completed: "Completado",
-  watching: "Viendo",
-  plan_to_watch: "Planeo ver",
-  on_hold: "En pausa",
-  dropped: "Abandonado",
+  completed: "Completed",
+  watching: "Watching",
+  plan_to_watch: "Plan to Watch",
+  on_hold: "On Hold",
+  dropped: "Dropped",
 };
 
 function buildStatusSelect(option) {
-  const select = el("select", { attrs: { "aria-label": `Estado de ${option.label}` } });
+  const select = el("select", { attrs: { "aria-label": `Status of ${option.label}` } });
   for (const [value, label] of Object.entries(LIST_STATUS_LABELS)) {
     select.append(el("option", { text: label, attrs: { value } }));
   }
-  // Clics y teclas dentro del select no deben marcar la tarjeta ni disparar atajos.
+  // Clicks and keys inside the select must not toggle the card or trigger shortcuts.
   for (const type of ["click", "keydown"]) {
     select.addEventListener(type, (event) => event.stopPropagation());
   }
@@ -256,8 +256,8 @@ function toggleSelection(option) {
 function updateConfirm() {
   const button = $("confirm-btn");
   button.textContent = selection.size > 0
-    ? `Confirmar selección (${selection.size}) (Enter)`
-    : "Confirmar selección (Enter)";
+    ? `Confirm selection (${selection.size}) (Enter)`
+    : "Confirm selection (Enter)";
   button.disabled = busy || selection.size === 0;
 }
 
@@ -272,7 +272,7 @@ function buildCards(options) {
       el("div", { text: option.label, className: "card-label" }),
       buildMetaLine(option),
       el("div", { text: `MAL id ${option.mal_id}`, className: "card-meta" }),
-      externalLink("Ver en MAL", `https://myanimelist.net/anime/${encodeURIComponent(option.mal_id)}`),
+      externalLink("View on MAL", `https://myanimelist.net/anime/${encodeURIComponent(option.mal_id)}`),
       select,
     ]);
     card.setAttribute("role", "button");
@@ -296,7 +296,7 @@ function buildOptionList(options) {
     const row = el("div", { className: "option-row" }, [
       el("span", { text: `${option.number}.`, className: "num" }),
       el("span", { text: option.label, className: "label" }),
-      externalLink("Buscar en Google", googleUrl(option.label)),
+      externalLink("Search on Google", googleUrl(option.label)),
     ]);
     makeActivatable(row, () => submit(() => choose(option.number)));
     list.append(row);
@@ -306,8 +306,8 @@ function buildOptionList(options) {
 
 function renderFinished(view) {
   const { summary } = view;
-  $("imported-count").textContent = `Importados: ${summary.imported}`;
-  $("rejected-count").textContent = `Rechazados: ${summary.rejected.length}`;
+  $("imported-count").textContent = `Imported: ${summary.imported}`;
+  $("rejected-count").textContent = `Rejected: ${summary.rejected.length}`;
 
   const counts = [];
   for (const [status, label] of Object.entries(LIST_STATUS_LABELS)) {
@@ -321,7 +321,7 @@ function renderFinished(view) {
   if (summary.rejected.length === 0) {
     holder.replaceChildren();
   } else {
-    const head = el("tr", {}, [el("th", { text: "Título" }), el("th", { text: "Motivo" })]);
+    const head = el("tr", {}, [el("th", { text: "Title" }), el("th", { text: "Reason" })]);
     const rows = summary.rejected.map((item) =>
       el("tr", {}, [el("td", { text: item.title }), el("td", { text: item.reason })]),
     );
@@ -340,11 +340,11 @@ function updateDownloadLink() {
 }
 
 function renderFailed(view) {
-  $("failed-msg").textContent = view.error || "Ocurrió un error inesperado.";
+  $("failed-msg").textContent = view.error || "An unexpected error occurred.";
   showScreen("failed");
 }
 
-// ---------------------------------------------------------------- acciones
+// ---------------------------------------------------------------- actions
 
 function setBusy(flag) {
   busy = flag;
@@ -354,7 +354,7 @@ function setBusy(flag) {
   updateConfirm();
 }
 
-// Ejecuta una acción choose/discard bloqueando la UI y los atajos mientras está en curso.
+// Run a choose/discard action, blocking the UI and the shortcuts while it is in flight.
 async function submit(action) {
   if (busy || !currentView || currentView.status !== "question") return;
   setBusy(true);
@@ -395,7 +395,7 @@ function countLines(text) {
 
 function updateLineCount() {
   const count = countLines($("titles-input").value);
-  $("line-count").textContent = count === 1 ? "1 título" : `${count} títulos`;
+  $("line-count").textContent = count === 1 ? "1 title" : `${count} titles`;
   $("start-btn").disabled = count === 0;
 }
 
@@ -439,7 +439,7 @@ function onKeydown(event) {
   }
   const { question } = currentView;
   if (event.key === "Enter" && question.kind === "candidate") {
-    // Si el foco está en un botón o link, Enter conserva su acción nativa.
+    // If focus is on a button or link, Enter keeps its native action.
     if (target instanceof HTMLElement && target.matches("button, a")) return;
     event.preventDefault();
     confirmSelection();

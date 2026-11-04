@@ -29,7 +29,7 @@ class ListStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AnimeCandidate:
-    """Resultado de búsqueda (reemplaza el dict {"id", "title", "imagen"})."""
+    """Search result."""
 
     mal_id: int
     title: str
@@ -55,7 +55,7 @@ def suggest_list_status(airing: AiringStatus) -> ListStatus:
 
 @dataclass(frozen=True, slots=True)
 class NormalizedTitle:
-    """Salida de Gemini para un título de la lista."""
+    """Gemini output for one title of the list."""
 
     index: int
     romaji: str
@@ -66,7 +66,7 @@ class NormalizedTitle:
 
 @dataclass(frozen=True, slots=True)
 class ImportedAnime:
-    """Anime resuelto, listo para el XML (reemplaza la tupla (id, title))."""
+    """Resolved anime, ready for the XML."""
 
     mal_id: int
     title: str
@@ -75,7 +75,7 @@ class ImportedAnime:
 
 @dataclass(frozen=True, slots=True)
 class RejectedTitle:
-    """Título que no se importó (reemplaza la tupla (title, reason))."""
+    """Title that was not imported."""
 
     original_title: str
     reason: str

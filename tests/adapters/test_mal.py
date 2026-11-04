@@ -177,3 +177,52 @@ def test_parse_zero_episodes_is_none():
     (candidate,) = parse_search_response({"data": [{"node": node}]})
 
     assert candidate.episodes is None
+
+
+class _FakeClock:
+    def __init__(self) -> None:
+        self.now = 100.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _throttled_searcher(sleeps: list[float], clock: _FakeClock) -> MalSearcher:
+    return MalSearcher(
+        client_id="abc",
+        session=_RecordingSession(),
+        min_interval=1.0,
+        clock=clock,
+        sleep=sleeps.append,
+    )
+
+
+def test_first_search_does_not_sleep():
+    sleeps: list[float] = []
+    _throttled_searcher(sleeps, _FakeClock()).search("Naruto")
+
+    assert sleeps == []
+
+
+def test_second_search_too_soon_sleeps_remaining_interval():
+    sleeps: list[float] = []
+    clock = _FakeClock()
+    searcher = _throttled_searcher(sleeps, clock)
+
+    searcher.search("Naruto")
+    clock.now += 0.3
+    searcher.search("Bleach")
+
+    assert sleeps == [pytest.approx(0.7)]
+
+
+def test_second_search_after_interval_does_not_sleep():
+    sleeps: list[float] = []
+    clock = _FakeClock()
+    searcher = _throttled_searcher(sleeps, clock)
+
+    searcher.search("Naruto")
+    clock.now += 1.5
+    searcher.search("Bleach")
+
+    assert sleeps == []

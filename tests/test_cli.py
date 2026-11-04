@@ -30,8 +30,8 @@ def _reader(answers: list[str]):
 def test_ask_option_retries_until_valid(capsys):
     assert ask_option(3, _reader(["abc", "9", "2"])) == 2
     output = capsys.readouterr().out
-    assert "No es un número" in output
-    assert "Fuera de rango" in output
+    assert "Not a number" in output
+    assert "Out of range" in output
 
 
 def test_ask_option_lowercase_x_discards():
@@ -83,11 +83,11 @@ def test_main_empty_input_returns_1_without_writing_files(monkeypatch, tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setenv("MAL_CLIENT_ID", "m")
-    empty = tmp_path / "vacio.txt"
+    empty = tmp_path / "empty.txt"
     empty.write_text("", encoding="utf-8")
 
     assert main(["--input", str(empty)]) == 1
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["vacio.txt"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["empty.txt"]
 
 
 class _AutoNormalizer:
@@ -109,7 +109,7 @@ def test_main_overwrite_flag_reaches_xml(monkeypatch, tmp_path, flags, expected)
         "anime_importer.cli.build_session",
         lambda settings, titles: ImportSession(titles, _AutoNormalizer(), _AutoSearcher()),
     )
-    titles = tmp_path / "lista.txt"
+    titles = tmp_path / "list.txt"
     titles.write_text("naruto\n", encoding="utf-8")
     output = tmp_path / "out.xml"
 

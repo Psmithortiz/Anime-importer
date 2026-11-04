@@ -128,11 +128,11 @@ def test_parse_ignores_leading_text():
 
 def test_parse_without_list_raises():
     with pytest.raises(BatchValidationError):
-        parse_normalization_response("Lo siento, no puedo ayudar.", 1)
+        parse_normalization_response("Sorry, I can't help with that.", 1)
 
 
 def test_normalize_empty_text_every_attempt_raises_normalization_error(monkeypatch):
-    monkeypatch.setattr(time, "sleep", lambda _: None)  # tenacity espera entre reintentos
+    monkeypatch.setattr(time, "sleep", lambda _: None)  # tenacity waits between retries
     calls = []
 
     def generate_content(model, contents, config):

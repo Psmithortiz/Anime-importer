@@ -142,7 +142,7 @@ button:disabled {
   }
 }
 
-/* Progreso */
+/* Progress */
 .progress {
   display: flex;
   align-items: center;
@@ -164,7 +164,7 @@ button:disabled {
   transition: width 0.3s;
 }
 
-/* Tarjetas de candidatos */
+/* Candidate cards */
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(160px, 14vw, 260px), 1fr));
@@ -292,7 +292,7 @@ button:disabled {
   font-size: 0.8rem;
 }
 
-/* Lista de opciones de normalización */
+/* Normalization option list */
 .option-list {
   display: flex;
   flex-direction: column;
@@ -328,7 +328,7 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-/* Deshabilitado mientras hay una petición en curso */
+/* Disabled while a request is in flight */
 .busy .card,
 .busy .option-row {
   opacity: 0.5;
@@ -336,7 +336,7 @@ button:disabled {
   pointer-events: none;
 }
 
-/* Tabla de rechazados */
+/* Rejected table */
 table {
   width: 100%;
   border-collapse: collapse;

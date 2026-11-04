@@ -74,7 +74,7 @@ def parse_search_response(data: dict) -> list[AnimeCandidate]:
 
 
 class MalSearcher:
-    """Búsqueda en la API oficial de MyAnimeList (v2)."""
+    """Search on the official MyAnimeList API (v2)."""
 
     def __init__(
         self,

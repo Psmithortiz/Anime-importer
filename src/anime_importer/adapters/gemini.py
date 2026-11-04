@@ -48,27 +48,27 @@ class BatchValidationError(Exception):
 
 
 def cache_version(model: str) -> str:
-    """Identifica modelo + prompt: si cambia alguno, el caché anterior deja de valer."""
+    """Identify model + prompt: if either changes, the previous cache is no longer valid."""
     return hashlib.sha256(f"{model}\n{PROMPT_TEMPLATE}".encode()).hexdigest()[:12]
 
 
 def parse_normalization_response(text: str | None, expected_count: int) -> list[NormalizedTitle]:
     if text is None or not text.strip():
-        raise BatchValidationError("Respuesta vacía de Gemini")
+        raise BatchValidationError("Empty response from Gemini")
     start = text.find("[")
     if start == -1:
-        raise BatchValidationError("La respuesta no contiene una lista JSON")
+        raise BatchValidationError("The response does not contain a JSON list")
     data, _ = json.JSONDecoder().raw_decode(text, start)
     if not isinstance(data, list):
-        raise BatchValidationError("No es una lista")
+        raise BatchValidationError("Not a list")
     if len(data) != expected_count:
         raise BatchValidationError(
-            f"Lista incompleta, esperados: {expected_count}, recibidos: {len(data)}"
+            f"Incomplete list, expected: {expected_count}, received: {len(data)}"
         )
     expected = set(range(1, expected_count + 1))
     received = {item["n"] for item in data}
     if expected != received:
-        raise BatchValidationError(f"Faltan: {expected - received}, sobran:{received - expected}")
+        raise BatchValidationError(f"Missing: {expected - received}, extra: {received - expected}")
     results = [
         NormalizedTitle(
             index=item["n"],
@@ -122,13 +122,13 @@ class GeminiNormalizer:
         chunks = [titles[i : i + size] for i in range(0, len(titles), size)]
         results: list[NormalizedTitle] = []
         for number, chunk in enumerate(chunks, start=1):
-            logger.info("Normalizando chunk %d/%d", number, len(chunks))
+            logger.info("Normalizing chunk %d/%d", number, len(chunks))
             offset = (number - 1) * size
             try:
                 chunk_results = self._normalize_chunk(chunk)
             except (errors.APIError, json.JSONDecodeError, BatchValidationError, KeyError) as exc:
                 raise NormalizationError(
-                    f"Falló la normalización del chunk {number}/{len(chunks)}: {exc}"
+                    f"Normalization failed for chunk {number}/{len(chunks)}: {exc}"
                 ) from exc
             if on_chunk is not None:
                 on_chunk(chunk, chunk_results)

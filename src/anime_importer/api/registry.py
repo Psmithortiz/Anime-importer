@@ -23,11 +23,11 @@ SessionFactory = Callable[[Sequence[str]], ImportSession]
 
 
 class SessionNotFoundError(Exception):
-    """No existe una sesión con ese id."""
+    """No session exists with that id."""
 
 
 class InvalidStateError(Exception):
-    """La operación no es válida en el estado actual de la sesión."""
+    """The operation is not valid in the current state of the session."""
 
 
 @dataclass
@@ -39,7 +39,7 @@ class ManagedSession:
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def run_start(self) -> None:
-        """Se ejecuta en segundo plano. Nunca debe dejar el estado en "normalizing"."""
+        """Runs in the background. Must never leave the status at "normalizing"."""
         with self.lock:
             try:
                 self._apply(self.session.start())
@@ -47,8 +47,8 @@ class ManagedSession:
                 self.error = str(exc)
                 self.status = "failed"
             except Exception:
-                logger.exception("Falló la sesión %s", self.id)
-                self.error = "Error interno al procesar la lista"
+                logger.exception("Session %s failed", self.id)
+                self.error = "Internal error while processing the list"
                 self.status = "failed"
 
     def choose(self, option: int) -> None:
@@ -73,7 +73,7 @@ class ManagedSession:
         return step
 
     def view(self) -> SessionView:
-        """No toma el lock: run_start lo retiene durante minutos y bloquearía el polling."""
+        """Does not take the lock: run_start holds it for minutes and would block polling."""
         status = self.status
         done, total = self.session.progress
         question = None
@@ -107,7 +107,7 @@ class ManagedSession:
 
     def _require(self, expected: SessionStatus) -> None:
         if self.status != expected:
-            raise InvalidStateError(f"Operación no válida en estado '{self.status}'")
+            raise InvalidStateError(f"Operation not valid in state '{self.status}'")
 
 
 class SessionRegistry:

@@ -28,7 +28,7 @@ class FakeNormalizer:
 
 class FailingNormalizer:
     def normalize(self, titles):
-        raise NormalizationError("Gemini no responde")
+        raise NormalizationError("Gemini is not responding")
 
 
 class FakeSearcher:
@@ -95,7 +95,7 @@ def test_discard_records_rejection():
     assert view["status"] == "finished"
     assert view["summary"]["imported"] == 0
     assert view["summary"]["rejected"] == [
-        {"title": "hellsing", "reason": "Descartado en menú de búsqueda (query: hellsing)"}
+        {"title": "hellsing", "reason": "Discarded in search menu (query: hellsing)"}
     ]
 
 
@@ -157,7 +157,7 @@ def test_normalization_failure_shows_failed_status():
     view = client.get(f"/api/sessions/{session_id}").json()
 
     assert view["status"] == "failed"
-    assert view["error"] == "Gemini no responde"
+    assert view["error"] == "Gemini is not responding"
 
 
 def test_root_serves_static_page():

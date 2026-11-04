@@ -13,7 +13,7 @@ def read_titles(path: Path) -> list[str]:
 
 
 def render_rejected_report(rejected: Sequence[RejectedTitle]) -> str:
-    lines = ["TITULO | MOTIVO DEL ERROR", "-" * 30]
+    lines = ["TITLE | REASON", "-" * 30]
     lines.extend(f"{item.original_title} | {item.reason}" for item in rejected)
     return "\n".join(lines) + "\n"
 
