@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from typing import Annotated
 
@@ -23,6 +24,24 @@ from anime_importer.api.schemas import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+_POLLING_PATH = re.compile(r"^/api/sessions/[0-9a-f]+$")
+
+
+class PollingAccessFilter(logging.Filter):
+    """Hides successful polling requests (GET /api/sessions/<id> → 200) from the access log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if not isinstance(args, tuple) or len(args) != 5:
+            return True
+        _client, method, path, _http_version, status = args
+        return not (
+            method == "GET"
+            and isinstance(path, str)
+            and _POLLING_PATH.match(path) is not None
+            and status == 200
+        )
 
 
 def get_registry(request: Request) -> SessionRegistry:
@@ -152,4 +171,7 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
 
 def run() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    uvicorn.run("anime_importer.api.app:create_app", factory=True)
+    config = uvicorn.Config("anime_importer.api.app:create_app", factory=True)
+    # Config configures uvicorn's logging in its constructor, so the filter goes after it.
+    logging.getLogger("uvicorn.access").addFilter(PollingAccessFilter())
+    uvicorn.Server(config).run()
