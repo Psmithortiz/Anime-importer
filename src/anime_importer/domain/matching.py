@@ -21,8 +21,11 @@ def match_candidates(query: str, candidates: Sequence[AnimeCandidate]) -> MatchR
     if not candidates:
         return MatchResult(accepted=None)
     titles = [c.title for c in candidates]
-    _, score, index = process.extractOne(query, titles, processor=utils.default_process)
-    if score >= AUTO_ACCEPT_SCORE:
-        return MatchResult(accepted=candidates[index])
-    top = process.extract(query, titles, processor=utils.default_process, limit=MAX_OPTIONS)
-    return MatchResult(accepted=None, options=tuple(candidates[i] for _, _, i in top))
+    scored = process.extract(query, titles, processor=utils.default_process, limit=None)
+    above = [i for _, score, i in scored if score >= AUTO_ACCEPT_SCORE]
+    if len(above) == 1:
+        return MatchResult(accepted=candidates[above[0]])
+    return MatchResult(
+        accepted=None,
+        options=tuple(candidates[i] for _, _, i in scored[:MAX_OPTIONS]),
+    )

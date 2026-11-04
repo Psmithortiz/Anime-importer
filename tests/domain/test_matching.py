@@ -30,3 +30,13 @@ def test_duplicate_titles_keep_both_ids():
     result = match_candidates("Gintama Movie", candidates)
     assert result.accepted is None
     assert {c.mal_id for c in result.options} == {10, 20}
+
+
+def test_tie_above_threshold_is_not_auto_accepted():
+    candidates = [
+        AnimeCandidate(mal_id=10, title="Gintama"),
+        AnimeCandidate(mal_id=20, title="Gintama"),
+    ]
+    result = match_candidates("Gintama", candidates)
+    assert result.accepted is None
+    assert {c.mal_id for c in result.options} == {10, 20}
