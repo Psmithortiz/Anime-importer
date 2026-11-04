@@ -20,12 +20,23 @@ class MatchResult:
 def match_candidates(query: str, candidates: Sequence[AnimeCandidate]) -> MatchResult:
     if not candidates:
         return MatchResult(accepted=None)
-    titles = [c.title for c in candidates]
-    scored = process.extract(query, titles, processor=utils.default_process, limit=None)
-    above = [i for _, score, i in scored if score >= AUTO_ACCEPT_SCORE]
+    texts: list[str] = []
+    owners: list[int] = []
+    for position, candidate in enumerate(candidates):
+        for text in (candidate.title, *candidate.alternative_titles):
+            if text:
+                texts.append(text)
+                owners.append(position)
+    best: dict[int, float] = {}
+    for _, score, text_index in process.extract(
+        query, texts, processor=utils.default_process, limit=None
+    ):
+        best.setdefault(owners[text_index], score)
+    ranked = list(best)
+    above = [position for position in ranked if best[position] >= AUTO_ACCEPT_SCORE]
     if len(above) == 1:
         return MatchResult(accepted=candidates[above[0]])
     return MatchResult(
         accepted=None,
-        options=tuple(candidates[i] for _, _, i in scored[:MAX_OPTIONS]),
+        options=tuple(candidates[position] for position in ranked[:MAX_OPTIONS]),
     )

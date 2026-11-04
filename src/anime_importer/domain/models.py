@@ -8,6 +8,7 @@ class AnimeCandidate:
     mal_id: int
     title: str
     image_url: str | None = None
+    alternative_titles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
