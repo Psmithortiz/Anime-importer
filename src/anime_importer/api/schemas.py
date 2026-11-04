@@ -1,0 +1,79 @@
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
+
+SessionStatus = Literal["normalizing", "question", "finished", "failed"]
+
+
+class CreateSessionRequest(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class ChooseRequest(BaseModel):
+    option: int = Field(ge=1)
+
+
+class OptionOut(BaseModel):
+    number: int
+    label: str
+    mal_id: int | None = None
+    image_url: str | None = None
+
+
+class QuestionOut(BaseModel):
+    kind: Literal["normalization", "candidate"]
+    original_title: str
+    query: str | None = None
+    options: list[OptionOut]
+
+
+class ProgressOut(BaseModel):
+    done: int
+    total: int
+
+
+class RejectedOut(BaseModel):
+    title: str
+    reason: str
+
+
+class SummaryOut(BaseModel):
+    imported: int
+    rejected: list[RejectedOut]
+
+
+class SessionView(BaseModel):
+    id: str
+    status: SessionStatus
+    progress: ProgressOut
+    error: str | None = None
+    question: QuestionOut | None = None
+    summary: SummaryOut | None = None
+
+
+def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
+    if isinstance(step, NormalizationChoice):
+        return QuestionOut(
+            kind="normalization",
+            original_title=step.original_title,
+            options=[
+                OptionOut(number=number, label=label)
+                for number, label in enumerate(step.options, start=1)
+            ],
+        )
+    return QuestionOut(
+        kind="candidate",
+        original_title=step.original_title,
+        query=step.query,
+        options=[
+            OptionOut(
+                number=number,
+                label=candidate.title,
+                mal_id=candidate.mal_id,
+                image_url=candidate.image_url,
+            )
+            for number, candidate in enumerate(step.options, start=1)
+        ],
+    )
