@@ -144,3 +144,10 @@ def test_normalization_failure_shows_failed_status():
 
 def test_root_serves_static_page():
     assert _client().get("/").status_code == 200
+
+
+def test_static_assets_are_served():
+    client = _client()
+
+    assert client.get("/app.js").status_code == 200
+    assert client.get("/styles.css").status_code == 200

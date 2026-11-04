@@ -2,10 +2,70 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Anime Importer</title>
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <h1>Anime Importer</h1>
-    <p>Frontend pendiente (paso 1.11c).</p>
+    <main>
+      <!-- 1. Inicio -->
+      <section id="screen-start" hidden>
+        <h1>Anime Importer</h1>
+        <p class="muted">Pega tu lista de anime (un título por línea) o carga un archivo .txt.</p>
+        <textarea id="titles-input" rows="14" placeholder="Naruto&#10;Hellsing&#10;..."></textarea>
+        <div class="row">
+          <input id="file-input" type="file" accept=".txt,text/plain" />
+          <span id="line-count" class="muted">0 títulos</span>
+        </div>
+        <p id="start-error" class="error" hidden></p>
+        <button id="start-btn" class="primary" type="button" disabled>Empezar importación</button>
+      </section>
+
+      <!-- 2. Normalizando -->
+      <section id="screen-normalizing" hidden>
+        <h1>Anime Importer</h1>
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="normalizing-msg" class="center"></p>
+        <p id="poll-warning" class="warning center" hidden>
+          Sin conexión con el servidor. Reintentando…
+        </p>
+      </section>
+
+      <!-- 3. Pregunta -->
+      <section id="screen-question" hidden>
+        <div class="progress">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <span id="progress-text" class="muted"></span>
+        </div>
+        <h2 id="question-title"></h2>
+        <p class="muted">
+          <span id="question-query" hidden></span>
+          <a id="question-google" target="_blank" rel="noopener">Buscar en Google</a>
+        </p>
+        <div id="options"></div>
+        <p id="question-error" class="error" hidden></p>
+        <button id="discard-btn" class="danger" type="button">Descartar (X)</button>
+      </section>
+
+      <!-- 4. Terminado -->
+      <section id="screen-finished" hidden>
+        <h1>Importación terminada</h1>
+        <p id="imported-count"></p>
+        <p id="rejected-count"></p>
+        <div id="rejected-table"></div>
+        <div class="row">
+          <a id="download-link" class="button primary" download="anime_import.xml">Descargar XML</a>
+          <button class="new-import" type="button">Nueva importación</button>
+        </div>
+      </section>
+
+      <!-- 5. Falló -->
+      <section id="screen-failed" hidden>
+        <h1>La importación falló</h1>
+        <p id="failed-msg" class="error"></p>
+        <button class="new-import" type="button">Nueva importación</button>
+      </section>
+    </main>
+    <script src="/app.js"></script>
   </body>
 </html>
