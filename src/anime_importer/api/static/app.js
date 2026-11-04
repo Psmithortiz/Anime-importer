@@ -380,9 +380,10 @@ function buildCandidateLayout(question) {
 function buildOptionList(options) {
   const list = el("div", { className: "option-list" });
   for (const option of options) {
-    const row = el("div", { className: "option-row" }, [
+    const text = option.is_original ? `✎ Your line: "${option.label}"` : option.label;
+    const row = el("div", { className: option.is_original ? "option-row original" : "option-row" }, [
       el("span", { text: `${option.number}.`, className: "num" }),
-      el("span", { text: option.label, className: "label" }),
+      el("span", { text, className: "label" }),
       externalLink("Search on Google", googleUrl(option.label)),
     ]);
     makeActivatable(row, () => submit(() => choose(option.number)));

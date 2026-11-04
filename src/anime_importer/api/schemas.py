@@ -41,6 +41,7 @@ class OptionOut(BaseModel):
     episodes: int | None = None
     airing_status: AiringStatus | None = None
     suggested_status: ListStatus | None = None
+    is_original: bool = False
 
 
 class FranchiseOptionOut(BaseModel):
@@ -99,7 +100,7 @@ def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
             kind="normalization",
             original_title=step.original_title,
             options=[
-                OptionOut(number=number, label=label)
+                OptionOut(number=number, label=label, is_original=number == step.original_option)
                 for number, label in enumerate(step.options, start=1)
             ],
         )

@@ -331,6 +331,11 @@ button:disabled {
   color: var(--accent);
 }
 
+.option-row.original .label {
+  font-style: italic;
+  color: var(--muted);
+}
+
 .option-row .label {
   flex: 1;
   overflow-wrap: anywhere;

@@ -25,6 +25,7 @@ class NormalizationChoice:
 
     original_title: str
     options: tuple[str, ...]
+    original_option: int | None = None  # 1-based number of the option that is the user's line
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,7 +263,16 @@ class ImportSession:
         if not data.is_anime:
             return Rejected("Not an anime (according to the normalizer)")
         if data.ambiguous:
-            return Ask(NormalizationChoice(original_title=original, options=data.options))
+            options = tuple(data.options)
+            original_option = None
+            if not any(_same_query(original, option) for option in options):
+                options = (*options, original)  # the user's own line is always an option
+                original_option = len(options)
+            return Ask(
+                NormalizationChoice(
+                    original_title=original, options=options, original_option=original_option
+                )
+            )
         return self._resolve_query(original, data.romaji)
 
     def _resolve_query(self, original: str, query: str) -> Resolution:
