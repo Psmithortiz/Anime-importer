@@ -93,9 +93,9 @@ class ImportSession:
         """Descarta el título de la pregunta actual."""
         step = self._pending_question()
         if isinstance(step, NormalizationChoice):
-            reason = "Descartado en menú Gemini"
+            reason = "Descartado en menú de normalización"
         else:
-            reason = f"Descartado en menú Jikan (romaji: {step.query})"
+            reason = f"Descartado en menú de búsqueda (query: {step.query})"
         self._reject(step.original_title, reason)
         self._position += 1
         return self._advance()
@@ -124,10 +124,10 @@ class ImportSession:
         self, original: str, data: NormalizedTitle | None
     ) -> NormalizationChoice | CandidateChoice | None:
         if data is None:
-            self._reject(original, "No hay datos de Gemini")
+            self._reject(original, "Sin datos de normalización")
             return None
         if not data.is_anime:
-            self._reject(original, "No es un anime (según Gemini)")
+            self._reject(original, "No es un anime (según el normalizador)")
             return None
         if data.ambiguous:
             return NormalizationChoice(original_title=original, options=data.options)
@@ -137,10 +137,10 @@ class ImportSession:
         try:
             candidates = self._searcher.search(query)
         except SearchError as exc:
-            self._reject(original, f"Error de red Jikan: {exc}")
+            self._reject(original, f"Error de búsqueda: {exc}")
             return None
         if not candidates:
-            self._reject(original, f"No encontrado en Jikan (query: {query})")
+            self._reject(original, f"Sin resultados (query: {query})")
             return None
         result = match_candidates(query, candidates)
         if result.accepted is not None:

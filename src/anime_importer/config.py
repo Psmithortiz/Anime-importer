@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str
     gemini_model: str = "gemini-2.5-flash"
+    mal_client_id: str
     input_path: Path = Path("anime_list.txt")
     output_xml_path: Path = Path("output.xml")
     rejected_report_path: Path = Path("errores.txt")

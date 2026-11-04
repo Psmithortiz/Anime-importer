@@ -6,7 +6,7 @@ from pathlib import Path
 from google import genai
 
 from anime_importer.adapters.gemini import GeminiNormalizer
-from anime_importer.adapters.jikan import JikanSearcher
+from anime_importer.adapters.mal import MalSearcher
 from anime_importer.adapters.mal_xml import write_mal_xml
 from anime_importer.adapters.text_files import read_titles, write_rejected_report
 from anime_importer.config import Settings
@@ -26,7 +26,9 @@ def build_session(settings: Settings, titles: Sequence[str]) -> ImportSession:
     """Raíz de composición: el único lugar que decide qué adaptadores concretos se usan."""
     client = genai.Client(api_key=settings.gemini_api_key)
     normalizer = GeminiNormalizer(client=client, model=settings.gemini_model)
-    return ImportSession(titles, normalizer=normalizer, searcher=JikanSearcher())
+    return ImportSession(
+        titles, normalizer=normalizer, searcher=MalSearcher(client_id=settings.mal_client_id)
+    )
 
 
 def describe_question(step: NormalizationChoice | CandidateChoice) -> str:

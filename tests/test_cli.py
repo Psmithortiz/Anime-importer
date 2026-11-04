@@ -66,6 +66,7 @@ def test_describe_question_includes_candidate_ids():
 def test_settings_defaults(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("MAL_CLIENT_ID", "m")
 
     settings = Settings()
 
