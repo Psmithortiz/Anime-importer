@@ -52,12 +52,21 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
         def session_factory(titles):
             return build_session(settings, titles)
 
-    app = FastAPI(title="Anime Importer")
+    app = FastAPI(
+        title="Anime Importer",
+        description="Normalize a messy anime list with Gemini and import it into MyAnimeList.",
+    )
     app.state.registry = SessionRegistry(session_factory)
 
     # Todos los endpoints son `def` (no `async def`): llaman a código bloqueante y FastAPI
     # los corre en un threadpool; con async def congelarían el event loop y el polling.
-    @app.post("/api/sessions", status_code=202, response_model=SessionView)
+    @app.post(
+        "/api/sessions",
+        status_code=202,
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Create an import session",
+    )
     def create_session(
         body: CreateSessionRequest, registry: RegistryDep, background: BackgroundTasks
     ) -> SessionView:
@@ -68,11 +77,21 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
         background.add_task(managed.run_start)
         return managed.view()
 
-    @app.get("/api/sessions/{session_id}", response_model=SessionView)
+    @app.get(
+        "/api/sessions/{session_id}",
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Get session state",
+    )
     def get_session(managed: ManagedDep) -> SessionView:
         return managed.view()
 
-    @app.post("/api/sessions/{session_id}/choose", response_model=SessionView)
+    @app.post(
+        "/api/sessions/{session_id}/choose",
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Choose one option",
+    )
     def choose(body: ChooseRequest, managed: ManagedDep) -> SessionView:
         try:
             managed.choose(body.option)
@@ -82,7 +101,12 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return managed.view()
 
-    @app.post("/api/sessions/{session_id}/choose-many", response_model=SessionView)
+    @app.post(
+        "/api/sessions/{session_id}/choose-many",
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Choose several candidates",
+    )
     def choose_many(body: ChooseManyRequest, managed: ManagedDep) -> SessionView:
         try:
             managed.choose_many([(item.option, item.status) for item in body.selections])
@@ -92,7 +116,12 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return managed.view()
 
-    @app.post("/api/sessions/{session_id}/discard", response_model=SessionView)
+    @app.post(
+        "/api/sessions/{session_id}/discard",
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Discard current title",
+    )
     def discard(managed: ManagedDep) -> SessionView:
         try:
             managed.discard()
@@ -100,7 +129,11 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc)) from None
         return managed.view()
 
-    @app.get("/api/sessions/{session_id}/export.xml")
+    @app.get(
+        "/api/sessions/{session_id}/export.xml",
+        tags=["sessions"],
+        summary="Export MAL XML",
+    )
     def export_xml(managed: ManagedDep, overwrite: bool = False) -> Response:
         try:
             finished = managed.finished()

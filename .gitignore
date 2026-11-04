@@ -5,7 +5,6 @@ __pycache__/
 anime_list.txt
 errores.txt
 output.xml
-gemini_cache.json
 .idea/
 .cache/
 .venv/
