@@ -7,4 +7,5 @@ errores.txt
 output.xml
 gemini_cache.json
 .idea/
+.cache/
 .venv/

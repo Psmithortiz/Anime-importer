@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import time
@@ -15,7 +16,7 @@ from tenacity import (
 )
 
 from anime_importer.domain.models import NormalizedTitle
-from anime_importer.ports import NormalizationError
+from anime_importer.ports import ChunkCallback, NormalizationError
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,11 @@ PROMPT_TEMPLATE = """You are an expert anime title normalizer.
 
 class BatchValidationError(Exception):
     pass
+
+
+def cache_version(model: str) -> str:
+    """Identifica modelo + prompt: si cambia alguno, el caché anterior deja de valer."""
+    return hashlib.sha256(f"{model}\n{PROMPT_TEMPLATE}".encode()).hexdigest()[:12]
 
 
 def parse_normalization_response(text: str | None, expected_count: int) -> list[NormalizedTitle]:
@@ -87,6 +93,8 @@ def wait_seconds(retry_state: RetryCallState) -> float:
     attempt = retry_state.attempt_number
     if isinstance(exc, errors.ClientError) and exc.code == 429:
         return 30 * attempt
+    if isinstance(exc, errors.ServerError):
+        return 15 * 2 ** (attempt - 1)
     if isinstance(exc, BatchValidationError):
         return 2
     return 3 * 2 ** (attempt - 1)
@@ -107,7 +115,9 @@ class GeminiNormalizer:
         self._sleep_seconds = sleep_seconds
         self._sleep = sleep
 
-    def normalize(self, titles: Sequence[str]) -> list[NormalizedTitle]:
+    def normalize(
+        self, titles: Sequence[str], on_chunk: ChunkCallback | None = None
+    ) -> list[NormalizedTitle]:
         size = self._chunk_size
         chunks = [titles[i : i + size] for i in range(0, len(titles), size)]
         results: list[NormalizedTitle] = []
@@ -120,6 +130,8 @@ class GeminiNormalizer:
                 raise NormalizationError(
                     f"Falló la normalización del chunk {number}/{len(chunks)}: {exc}"
                 ) from exc
+            if on_chunk is not None:
+                on_chunk(chunk, chunk_results)
             results.extend(replace(t, index=t.index + offset) for t in chunk_results)
             if number < len(chunks):
                 self._sleep(self._sleep_seconds)
@@ -127,7 +139,7 @@ class GeminiNormalizer:
 
     @retry(
         retry=retry_if_exception(is_retryable),
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(4),
         wait=wait_seconds,
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,

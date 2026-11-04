@@ -10,6 +10,7 @@ from anime_importer.adapters.gemini import (
     GeminiNormalizer,
     is_retryable,
     parse_normalization_response,
+    wait_seconds,
 )
 from anime_importer.ports import NormalizationError
 
@@ -144,4 +145,38 @@ def test_normalize_empty_text_every_attempt_raises_normalization_error(monkeypat
     with pytest.raises(NormalizationError):
         normalizer.normalize(["a"])
 
-    assert len(calls) == 3
+    assert len(calls) == 4
+
+
+def test_normalize_calls_on_chunk_with_relative_indexes():
+    def generate_content(model, contents, config):
+        count = 2 if "1. a" in contents else 1
+        return SimpleNamespace(text=_response(count))
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    normalizer = GeminiNormalizer(client=client, chunk_size=2, sleep=lambda _: None)
+    seen = []
+
+    normalizer.normalize(
+        ["a", "b", "c"],
+        on_chunk=lambda chunk, res: seen.append((list(chunk), [t.index for t in res])),
+    )
+
+    assert seen == [(["a", "b"], [1, 2]), (["c"], [1])]
+
+
+@pytest.mark.parametrize(
+    ("exc", "attempt", "expected"),
+    [
+        (errors.ClientError(429, {}), 2, 60),
+        (errors.ServerError(503, {}), 1, 15),
+        (errors.ServerError(503, {}), 2, 30),
+        (errors.ServerError(503, {}), 3, 60),
+        (BatchValidationError("x"), 3, 2),
+        (json.JSONDecodeError("x", "", 0), 3, 12),
+    ],
+)
+def test_wait_seconds(exc, attempt, expected):
+    state = SimpleNamespace(outcome=SimpleNamespace(exception=lambda: exc), attempt_number=attempt)
+
+    assert wait_seconds(state) == expected
