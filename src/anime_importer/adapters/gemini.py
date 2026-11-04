@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -47,9 +46,13 @@ class BatchValidationError(Exception):
     pass
 
 
-def parse_normalization_response(text: str, expected_count: int) -> list[NormalizedTitle]:
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
-    data = json.loads(text)
+def parse_normalization_response(text: str | None, expected_count: int) -> list[NormalizedTitle]:
+    if text is None or not text.strip():
+        raise BatchValidationError("Respuesta vacía de Gemini")
+    start = text.find("[")
+    if start == -1:
+        raise BatchValidationError("La respuesta no contiene una lista JSON")
+    data, _ = json.JSONDecoder().raw_decode(text, start)
     if not isinstance(data, list):
         raise BatchValidationError("No es una lista")
     if len(data) != expected_count:

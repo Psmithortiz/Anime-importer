@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -102,4 +103,5 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
 
 
 def run() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     uvicorn.run("anime_importer.api.app:create_app", factory=True)

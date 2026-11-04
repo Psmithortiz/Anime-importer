@@ -1,4 +1,5 @@
 import json
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -105,3 +106,42 @@ def test_normalize_wraps_missing_key_in_normalization_error():
 
     with pytest.raises(NormalizationError):
         normalizer.normalize(["a"])
+
+
+@pytest.mark.parametrize("text", [None, "   "])
+def test_parse_empty_response_raises(text):
+    with pytest.raises(BatchValidationError):
+        parse_normalization_response(text, 1)
+
+
+def test_parse_ignores_trailing_text():
+    text = '[{"n": 1, "romaji": "A"}]\n\nSources: https://example.com [1]'
+    (item,) = parse_normalization_response(text, 1)
+    assert item.romaji == "A"
+
+
+def test_parse_ignores_leading_text():
+    (item,) = parse_normalization_response('Here you go:\n[{"n": 1, "romaji": "A"}]', 1)
+    assert item.romaji == "A"
+
+
+def test_parse_without_list_raises():
+    with pytest.raises(BatchValidationError):
+        parse_normalization_response("Lo siento, no puedo ayudar.", 1)
+
+
+def test_normalize_empty_text_every_attempt_raises_normalization_error(monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda _: None)  # tenacity espera entre reintentos
+    calls = []
+
+    def generate_content(model, contents, config):
+        calls.append(contents)
+        return SimpleNamespace(text=None)
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    normalizer = GeminiNormalizer(client=client, sleep=lambda _: None)
+
+    with pytest.raises(NormalizationError):
+        normalizer.normalize(["a"])
+
+    assert len(calls) == 3
