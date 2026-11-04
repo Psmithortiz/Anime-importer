@@ -14,7 +14,10 @@ _MY_STATUS = {
 }
 
 
-def render_mal_xml(entries: Sequence[ImportedAnime], update_on_import: bool = False) -> bytes:
+def render_mal_xml(entries: Sequence[ImportedAnime]) -> bytes:
+    """Render the import file. MAL ignores entries with update_on_import=0, so it is always 1;
+    keeping the current list untouched is done with the "Don't overwrite entries already on my
+    list" checkbox on MAL's import page."""
     totals = Counter(entry.list_status for entry in entries)
     root = ET.Element("myanimelist")
     myinfo = ET.SubElement(root, "myinfo")
@@ -32,12 +35,10 @@ def render_mal_xml(entries: Sequence[ImportedAnime], update_on_import: bool = Fa
         ET.SubElement(anime, "series_animedb_id").text = str(entry.mal_id)
         ET.SubElement(anime, "series_title").text = entry.title
         ET.SubElement(anime, "my_status").text = _MY_STATUS[entry.list_status]
-        ET.SubElement(anime, "update_on_import").text = "1" if update_on_import else "0"
+        ET.SubElement(anime, "update_on_import").text = "1"
     ET.indent(root)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def write_mal_xml(
-    entries: Sequence[ImportedAnime], path: Path, update_on_import: bool = False
-) -> None:
-    path.write_bytes(render_mal_xml(entries, update_on_import))
+def write_mal_xml(entries: Sequence[ImportedAnime], path: Path) -> None:
+    path.write_bytes(render_mal_xml(entries))

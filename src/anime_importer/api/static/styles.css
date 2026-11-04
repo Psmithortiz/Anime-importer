@@ -286,10 +286,14 @@ button:disabled {
   padding: 0;
 }
 
-.overwrite {
-  display: block;
-  margin-top: 1rem;
-  cursor: pointer;
+.help-box {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 0.25rem solid var(--accent);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
 }
 
 .small-link {

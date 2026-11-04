@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
@@ -102,8 +100,7 @@ class _AutoSearcher:
         return [AnimeCandidate(20, "Naruto")]
 
 
-@pytest.mark.parametrize(("flags", "expected"), [([], "0"), (["--overwrite"], "1")])
-def test_main_overwrite_flag_reaches_xml(monkeypatch, tmp_path, flags, expected):
+def test_main_writes_xml_with_update_on_import_one(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setenv("MAL_CLIENT_ID", "m")
@@ -117,7 +114,7 @@ def test_main_overwrite_flag_reaches_xml(monkeypatch, tmp_path, flags, expected)
     titles.write_text("naruto\n", encoding="utf-8")
     output = tmp_path / "out.xml"
 
-    code = main(["--input", str(titles), "--output", str(output), *flags])
+    code = main(["--input", str(titles), "--output", str(output)])
 
     assert code == 0
-    assert f"<update_on_import>{expected}</update_on_import>" in output.read_text(encoding="utf-8")
+    assert "<update_on_import>1</update_on_import>" in output.read_text(encoding="utf-8")

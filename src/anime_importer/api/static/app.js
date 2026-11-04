@@ -398,7 +398,6 @@ function renderFinished(view) {
     if (count > 0) counts.push(el("li", { text: `${label}: ${count}` }));
   }
   $("status-counts").replaceChildren(...counts);
-  $("overwrite-checkbox").checked = false;
 
   const holder = $("rejected-table");
   if (summary.rejected.length === 0) {
@@ -417,9 +416,7 @@ function renderFinished(view) {
 }
 
 function updateDownloadLink() {
-  const overwrite = $("overwrite-checkbox").checked;
-  $("download-link").href =
-    `/api/sessions/${encodeURIComponent(currentView.id)}/export.xml?overwrite=${overwrite}`;
+  $("download-link").href = `/api/sessions/${encodeURIComponent(currentView.id)}/export.xml`;
 }
 
 function renderFailed(view) {
@@ -558,7 +555,6 @@ async function init() {
   $("start-btn").addEventListener("click", startImport);
   $("discard-btn").addEventListener("click", () => submit(discard));
   $("confirm-btn").addEventListener("click", confirmSelection);
-  $("overwrite-checkbox").addEventListener("change", updateDownloadLink);
   for (const button of document.querySelectorAll(".new-import")) {
     button.addEventListener("click", goToStart);
   }

@@ -266,16 +266,15 @@ def test_choose_many_after_finished_is_409():
     assert response.status_code == 409
 
 
-def test_export_overwrite_flag():
+def test_export_always_writes_update_on_import_one():
     client = _client()
     session_id = _create(client)
     client.post(f"/api/sessions/{session_id}/choose", json={"option": 1})
 
-    default = client.get(f"/api/sessions/{session_id}/export.xml")
-    forced = client.get(f"/api/sessions/{session_id}/export.xml?overwrite=true")
+    response = client.get(f"/api/sessions/{session_id}/export.xml")
 
-    assert "<update_on_import>0</update_on_import>" in default.text
-    assert "<update_on_import>1</update_on_import>" in forced.text
+    assert "<update_on_import>1</update_on_import>" in response.text
+    assert "<update_on_import>0</update_on_import>" not in response.text
 
 
 class ProgressNormalizer:

@@ -14,7 +14,7 @@ def test_render_two_entries():
     assert [a.findtext("series_animedb_id") for a in animes] == ["1", "20"]
     assert [a.findtext("series_title") for a in animes] == ["Cowboy Bebop", "Naruto"]
     assert all(a.findtext("my_status") == "Completed" for a in animes)
-    assert all(a.findtext("update_on_import") == "0" for a in animes)
+    assert all(a.findtext("update_on_import") == "1" for a in animes)
 
 
 def test_render_empty():
@@ -72,11 +72,8 @@ def test_render_statuses_and_totals():
     assert root.findtext("myinfo/user_total_dropped") == "1"
 
 
-def test_render_update_on_import_flag():
-    entries = [ImportedAnime(1, "A")]
+def test_update_on_import_is_always_one():
+    # MAL ignores entries with 0; protecting the list is MAL's own checkbox.
+    root = ET.fromstring(render_mal_xml([ImportedAnime(1, "A"), ImportedAnime(2, "B")]))
 
-    default = ET.fromstring(render_mal_xml(entries))
-    forced = ET.fromstring(render_mal_xml(entries, update_on_import=True))
-
-    assert default.findtext("anime/update_on_import") == "0"
-    assert forced.findtext("anime/update_on_import") == "1"
+    assert [a.findtext("update_on_import") for a in root.findall("anime")] == ["1", "1"]

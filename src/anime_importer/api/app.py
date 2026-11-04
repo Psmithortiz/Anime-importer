@@ -153,13 +153,13 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
         tags=["sessions"],
         summary="Export MAL XML",
     )
-    def export_xml(managed: ManagedDep, overwrite: bool = False) -> Response:
+    def export_xml(managed: ManagedDep) -> Response:
         try:
             finished = managed.finished()
         except InvalidStateError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from None
         return Response(
-            content=render_mal_xml(finished.imported, update_on_import=overwrite),
+            content=render_mal_xml(finished.imported),
             media_type="application/xml",
             headers={"Content-Disposition": 'attachment; filename="anime_import.xml"'},
         )
