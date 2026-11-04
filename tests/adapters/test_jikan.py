@@ -74,3 +74,56 @@ def test_search_wraps_non_retryable_error_in_search_error():
         JikanSearcher(session=FakeSession()).search("Naruto")
 
     assert exc_info.value.__cause__ is error
+
+
+class _EmptySession:
+    def get(self, *args, **kwargs):
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b'{"data": []}'
+        return response
+
+
+class _FakeClock:
+    def __init__(self) -> None:
+        self.now = 100.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _throttled_searcher(sleeps: list[float], clock: _FakeClock) -> JikanSearcher:
+    return JikanSearcher(
+        session=_EmptySession(), min_interval=1.0, clock=clock, sleep=sleeps.append
+    )
+
+
+def test_first_search_does_not_sleep():
+    sleeps: list[float] = []
+    _throttled_searcher(sleeps, _FakeClock()).search("Naruto")
+
+    assert sleeps == []
+
+
+def test_second_search_too_soon_sleeps_remaining_interval():
+    sleeps: list[float] = []
+    clock = _FakeClock()
+    searcher = _throttled_searcher(sleeps, clock)
+
+    searcher.search("Naruto")
+    clock.now += 0.3
+    searcher.search("Bleach")
+
+    assert sleeps == [pytest.approx(0.7)]
+
+
+def test_second_search_after_interval_does_not_sleep():
+    sleeps: list[float] = []
+    clock = _FakeClock()
+    searcher = _throttled_searcher(sleeps, clock)
+
+    searcher.search("Naruto")
+    clock.now += 1.5
+    searcher.search("Bleach")
+
+    assert sleeps == []
