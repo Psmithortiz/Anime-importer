@@ -2,10 +2,12 @@ import pytest
 import requests
 
 from anime_importer.adapters.jikan import (
+    JikanSearcher,
     is_retryable,
     parse_search_response,
     sanitize_query,
 )
+from anime_importer.ports import SearchError
 
 
 def _http_error(status: int) -> requests.HTTPError:
@@ -59,3 +61,16 @@ def test_is_retryable_true(exc):
 @pytest.mark.parametrize("exc", [_http_error(404), ValueError()])
 def test_is_retryable_false(exc):
     assert not is_retryable(exc)
+
+
+def test_search_wraps_non_retryable_error_in_search_error():
+    error = _http_error(404)
+
+    class FakeSession:
+        def get(self, *args, **kwargs):
+            raise error
+
+    with pytest.raises(SearchError) as exc_info:
+        JikanSearcher(session=FakeSession()).search("Naruto")
+
+    assert exc_info.value.__cause__ is error

@@ -16,6 +16,7 @@ from tenacity import (
 )
 
 from anime_importer.domain.models import NormalizedTitle
+from anime_importer.ports import NormalizationError
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,13 @@ class GeminiNormalizer:
         for number, chunk in enumerate(chunks, start=1):
             logger.info("Normalizando chunk %d/%d", number, len(chunks))
             offset = (number - 1) * size
-            results.extend(replace(t, index=t.index + offset) for t in self._normalize_chunk(chunk))
+            try:
+                chunk_results = self._normalize_chunk(chunk)
+            except (errors.APIError, json.JSONDecodeError, BatchValidationError, KeyError) as exc:
+                raise NormalizationError(
+                    f"Falló la normalización del chunk {number}/{len(chunks)}: {exc}"
+                ) from exc
+            results.extend(replace(t, index=t.index + offset) for t in chunk_results)
             if number < len(chunks):
                 self._sleep(self._sleep_seconds)
         return results

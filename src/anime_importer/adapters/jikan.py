@@ -11,6 +11,7 @@ from tenacity import (
 )
 
 from anime_importer.domain.models import AnimeCandidate
+from anime_importer.ports import SearchError
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ class JikanSearcher:
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    def search(self, query: str) -> list[AnimeCandidate]:
+    def _search_with_retry(self, query: str) -> list[AnimeCandidate]:
         response = self._session.get(
             f"{self._base_url}/anime",
             params={"q": sanitize_query(query), "limit": 25},
@@ -70,3 +71,9 @@ class JikanSearcher:
         )
         response.raise_for_status()
         return parse_search_response(response.json())
+
+    def search(self, query: str) -> list[AnimeCandidate]:
+        try:
+            return self._search_with_retry(query)
+        except requests.RequestException as exc:
+            raise SearchError(str(exc)) from exc

@@ -10,6 +10,7 @@ from anime_importer.adapters.gemini import (
     is_retryable,
     parse_normalization_response,
 )
+from anime_importer.ports import NormalizationError
 
 
 def _response(count: int) -> str:
@@ -77,3 +78,30 @@ def test_normalize_chunks_renumbers_and_sleeps_between_chunks():
     assert [t.index for t in result] == [1, 2, 3]
     assert len(calls) == 2
     assert sleeps == [13]
+
+
+def _client_raising(exc: Exception | None = None, text: str = ""):
+    def generate_content(model, contents, config):
+        if exc is not None:
+            raise exc
+        return SimpleNamespace(text=text)
+
+    return SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+
+
+def test_normalize_wraps_api_error_in_normalization_error():
+    error = errors.ClientError(400, {})
+    normalizer = GeminiNormalizer(client=_client_raising(error), sleep=lambda _: None)
+
+    with pytest.raises(NormalizationError) as exc_info:
+        normalizer.normalize(["a"])
+
+    assert exc_info.value.__cause__ is error
+
+
+def test_normalize_wraps_missing_key_in_normalization_error():
+    client = _client_raising(text='[{"romaji": "X"}]')
+    normalizer = GeminiNormalizer(client=client, chunk_size=1, sleep=lambda _: None)
+
+    with pytest.raises(NormalizationError):
+        normalizer.normalize(["a"])
