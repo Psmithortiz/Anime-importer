@@ -69,16 +69,17 @@ MAL XML export (import with "Don't overwrite entries already on my list")
 src/anime_importer/
 ├── domain/        Pure models and rules: dataclasses, enums, matching. No I/O, no frameworks.
 ├── ports.py       Protocols the core depends on (AnimeSearcher, TitleNormalizer) and their errors.
-├── adapters/      The outside world: Gemini, MAL, the normalization cache, XML and text files, and the demo recording replayer.
+├── adapters/      The outside world: Gemini, MAL, caches, XML and text files, demo replay.
 ├── services/      ImportSession: the state machine that drives an import and pauses for questions.
 ├── api/           FastAPI app, Pydantic schemas, in-memory session registry and the static frontend.
 ├── cli.py         Interactive terminal interface over the same service.
 └── bootstrap.py   Composition root: the only place that wires concrete adapters together.
-scripts/record_demo.py   Records the demo data with the real adapters (needs API keys).
 ```
 
 Dependencies point inward: `api / cli → services → domain ← adapters`. The domain never imports an
 HTTP client, an SDK or a web framework, so it is tested without network access or API keys.
+Outside the package, `scripts/record_demo.py` records the demo data with the real adapters (it
+needs API keys).
 
 ## Design decisions
 

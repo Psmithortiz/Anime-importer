@@ -99,8 +99,8 @@ def _filled() -> DemoRecording:
     recording = DemoRecording()
     recording.record_normalization("hellsing", NormalizedTitle(0, "Hellsing"))
     recording.record_search("Hellsing", [FULL, BARE])
-    recording.record_details(DETAILS)
-    recording.record_details(DETAILS_BARE)
+    recording.record_details(5, DETAILS)
+    recording.record_details(6, DETAILS_BARE)
     return recording
 
 
@@ -254,6 +254,21 @@ def test_recording_details_records_success():
 
     assert RecordingDetailsProvider(InnerDetails(), recording).get_details(5) == DETAILS
     assert recording.details == {5: DETAILS}
+
+
+class MergedEntryDetails:
+    def get_details(self, mal_id):
+        return AnimeDetails(AnimeCandidate(mal_id=2, title="Merged"), ())
+
+
+def test_recording_details_stores_under_the_requested_id():
+    recording = DemoRecording()
+
+    returned = RecordingDetailsProvider(MergedEntryDetails(), recording).get_details(1)
+
+    assert list(recording.details) == [1]
+    assert ReplayDetailsProvider(recording).get_details(1) == returned
+    assert returned.candidate.mal_id == 2
 
 
 def test_recorders_do_not_record_failures():

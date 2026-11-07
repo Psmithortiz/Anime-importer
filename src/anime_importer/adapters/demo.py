@@ -27,6 +27,9 @@ from anime_importer.ports import (
 
 # ---------------------------------------------------------------- serialization
 
+# Intentionally independent from details_cache.py: the demo recording and the details cache are
+# separate file formats, and changing one must not invalidate the other.
+
 
 def normalized_to_dict(title: NormalizedTitle) -> dict[str, Any]:
     """The index is not stored: it depends on the position in the list being processed."""
@@ -119,9 +122,11 @@ class DemoRecording:
         with self._lock:
             self.searches[query] = list(candidates)
 
-    def record_details(self, details: AnimeDetails) -> None:
+    def record_details(self, mal_id: int, details: AnimeDetails) -> None:
+        # Stored under the requested id because the replay looks it up by that id, and MAL may
+        # answer with a different one (merged entries).
         with self._lock:
-            self.details[details.candidate.mal_id] = details
+            self.details[mal_id] = details
 
     @classmethod
     def load(cls, path: Path) -> Self:
@@ -275,5 +280,5 @@ class RecordingDetailsProvider:
 
     def get_details(self, mal_id: int) -> AnimeDetails:
         details = self._inner.get_details(mal_id)
-        self._recording.record_details(details)
+        self._recording.record_details(mal_id, details)
         return details
