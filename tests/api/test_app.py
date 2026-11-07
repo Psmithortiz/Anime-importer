@@ -361,3 +361,18 @@ def test_view_includes_resolution_progress_while_preparing():
 
     assert view.resolution is not None
     assert (view.resolution.done, view.resolution.total) == (2, 2)
+
+
+def test_info_without_demo_text():
+    client = TestClient(create_app(lambda titles: None))
+
+    assert client.get("/api/info").json() == {"demo": False, "sample_text": None}
+
+
+SAMPLE = "Hellsing" + chr(10) + "Naruto" + chr(10)
+
+
+def test_info_with_demo_text():
+    client = TestClient(create_app(lambda titles: None, demo_text=SAMPLE))
+
+    assert client.get("/api/info").json() == {"demo": True, "sample_text": SAMPLE}

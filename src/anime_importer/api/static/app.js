@@ -569,6 +569,25 @@ function readFileInto(file) {
   reader.readAsText(file);
 }
 
+const DEMO_NOTICE =
+  "Demo mode: recorded MyAnimeList and Gemini responses, no API keys needed. " +
+  "Titles outside the sample list won't be found.";
+
+async function loadInfo() {
+  try {
+    const info = await api("GET", "/api/info");
+    if (!info.demo) return;
+    $("demo-banner").textContent = DEMO_NOTICE;
+    $("demo-banner").hidden = false;
+    if (info.sample_text && $("titles-input").value.trim() === "") {
+      $("titles-input").value = info.sample_text;
+      updateLineCount();
+    }
+  } catch {
+    // The info endpoint is optional: without it the app behaves as in normal mode.
+  }
+}
+
 async function init() {
   $("titles-input").addEventListener("input", updateLineCount);
   $("file-input").addEventListener("change", (event) => {
@@ -583,6 +602,8 @@ async function init() {
     button.addEventListener("click", goToStart);
   }
   document.addEventListener("keydown", onKeydown);
+
+  await loadInfo();
 
   const id = decodeURIComponent(location.hash.slice(1));
   if (!id) {

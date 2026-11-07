@@ -14,6 +14,11 @@ from anime_importer.services.import_session import CandidateChoice, Normalizatio
 SessionStatus = Literal["preparing", "question", "finished", "failed"]
 
 
+class AppInfo(BaseModel):
+    demo: bool
+    sample_text: str | None = None
+
+
 class CreateSessionRequest(BaseModel):
     text: str = Field(min_length=1)
 
