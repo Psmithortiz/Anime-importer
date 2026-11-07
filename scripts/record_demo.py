@@ -11,6 +11,7 @@ background pass. To have every option available at replay time, the script searc
 would do. The domain and the service stay untouched.
 """
 
+import logging
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -38,6 +39,7 @@ DEMO_DATA_DIR = Path(__file__).resolve().parent.parent / "src/anime_importer/ada
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     settings = Settings(demo=False)
     normalizer, searcher, details = build_real_adapters(settings)
     assert details is not None
@@ -63,7 +65,11 @@ def main() -> int:
     )
 
     step = session.start()
+    normalization = session.normalization_progress
+    print(f"Normalized {normalization[0] if normalization else len(titles)} titles.")
     while not isinstance(step, Finished):
+        done, total = session.progress
+        print(f"[{done}/{total}] {step.original_title}")
         if isinstance(step, NormalizationChoice):
             for query in dict.fromkeys((*step.options, step.original_title)):
                 _prefetch(query, rec_searcher, finder)
