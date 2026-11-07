@@ -39,6 +39,8 @@ layered architecture, tests and a proper API, built as a backend portfolio proje
   short initial buffer, so most questions appear instantly.
 - **Keyboard-first**: `1`–`9` to select, `Enter` to confirm, `X` to discard.
 - **REST API** documented automatically at `/docs`, plus an interactive CLI.
+- **Demo mode** (`DEMO=1`): replays recorded Gemini and MAL responses, so you can try the whole
+  flow without API keys.
 
 ![Selecting seasons from the candidates and the franchise column](docs/multi-select.png)
 *Picking Season 2 and Part 2 from the candidates, and the Season 1 prequel from the franchise column.*
@@ -67,11 +69,12 @@ MAL XML export (import with "Don't overwrite entries already on my list")
 src/anime_importer/
 ├── domain/        Pure models and rules: dataclasses, enums, matching. No I/O, no frameworks.
 ├── ports.py       Protocols the core depends on (AnimeSearcher, TitleNormalizer) and their errors.
-├── adapters/      The outside world: Gemini, MAL, the normalization cache, XML and text files.
+├── adapters/      The outside world: Gemini, MAL, the normalization cache, XML and text files, and the demo recording replayer.
 ├── services/      ImportSession: the state machine that drives an import and pauses for questions.
 ├── api/           FastAPI app, Pydantic schemas, in-memory session registry and the static frontend.
 ├── cli.py         Interactive terminal interface over the same service.
 └── bootstrap.py   Composition root: the only place that wires concrete adapters together.
+scripts/record_demo.py   Records the demo data with the real adapters (needs API keys).
 ```
 
 Dependencies point inward: `api / cli → services → domain ← adapters`. The domain never imports an
@@ -137,9 +140,29 @@ UI tells you which box to check.
 **No frontend framework.** The UI is plain HTML, CSS and JavaScript served by FastAPI. All data from
 external APIs is inserted with `textContent`, never `innerHTML`, to rule out XSS from titles.
 
+**Demo mode as a second swap of adapters.** `DEMO=1` makes `bootstrap.py` build replaying
+adapters instead of Gemini and MAL; the domain and the service do not change. The data is not
+written by hand: `scripts/record_demo.py` wraps the real adapters in recorders and walks a full
+import, including every option of ambiguous titles, so the demo replays real responses. The
+recording format is deliberately independent from the details cache, so changing one never
+invalidates the other.
+
 ## Setup
 
 Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
+
+### Try it without API keys
+
+Demo mode replays real Gemini and MyAnimeList responses recorded for a sample list, so it needs
+no `.env` and no network access to the APIs:
+
+```bash
+DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
+```
+
+On Windows PowerShell: `$env:DEMO="1"; uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web`
+
+The sample list is preloaded. Titles outside it won't be found.
 
 ### Quick run (no clone)
 
