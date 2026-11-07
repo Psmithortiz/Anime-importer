@@ -1,0 +1,7 @@
+# Allowlist: everything is excluded unless listed, so secrets (.env) and caches never reach the image.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+**/__pycache__
