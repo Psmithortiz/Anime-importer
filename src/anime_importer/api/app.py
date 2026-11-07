@@ -179,8 +179,16 @@ def create_app(
 
 
 def run() -> None:
+    from anime_importer.config import Settings
+
+    settings = Settings()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    config = uvicorn.Config("anime_importer.api.app:create_app", factory=True)
+    config = uvicorn.Config(
+        "anime_importer.api.app:create_app",
+        factory=True,
+        host=settings.host,
+        port=settings.port,
+    )
     # Config configures uvicorn's logging in its constructor, so the filter goes after it.
     logging.getLogger("uvicorn.access").addFilter(PollingAccessFilter())
     uvicorn.Server(config).run()
