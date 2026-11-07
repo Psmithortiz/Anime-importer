@@ -148,6 +148,13 @@ import, including every option of ambiguous titles, so the demo replays real res
 recording format is deliberately independent from the details cache, so changing one never
 invalidates the other.
 
+**A small, safe container.** The image is built in two stages: the first resolves dependencies with
+uv (cached as its own layer, so code changes don't reinstall them), the second copies only the
+virtual environment and runs as a non-root user. `.dockerignore` is an allowlist, so `.env` and local
+caches can never end up in the image; keys are passed at run time. The server binds to `0.0.0.0`
+only inside the container (through the `HOST` setting, so there is still a single entry point),
+and compose publishes it on `127.0.0.1` only, because the app has no authentication.
+
 ## Setup
 
 Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
@@ -164,6 +171,16 @@ DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-import
 On Windows PowerShell: `$env:DEMO="1"; uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web`
 
 The sample list is preloaded. Titles outside it won't be found.
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Open <http://127.0.0.1:8000>. It starts in demo mode. To use your own keys, put the `.env` file in
+the project root and run `DEMO=0 docker compose up` (PowerShell: `$env:DEMO="0"; docker compose up`).
+Normalization and MAL caches are kept in a Docker volume between runs.
 
 ### Quick run (no clone)
 
@@ -229,10 +246,11 @@ uv run pytest
 uv run ruff check src tests
 ```
 
-The suite (238 tests) runs without network access, API keys or real waits: adapters accept injected
+The suite runs without network access, API keys or real waits: adapters accept injected
 sessions, clients, clocks and sleep functions.
 
-CI runs both commands on Ubuntu and Windows for every pull request.
+CI runs both commands on Ubuntu and Windows for every pull request, and builds the Docker image
+with a demo-mode smoke test.
 
 ## Roadmap
 

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     details_cache_ttl_days: float = 7
     franchise_max_nodes: int = 40
     resolution_buffer: int = 20
+    host: str = "127.0.0.1"
+    port: int = 8000
     demo: bool = False
     demo_delay_seconds: float = 0.3
     demo_data_dir: Path = Path(__file__).parent / "adapters" / "demo_data"

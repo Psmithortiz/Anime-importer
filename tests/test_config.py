@@ -34,3 +34,20 @@ def test_with_keys_is_valid():
     settings = Settings(_env_file=None, gemini_api_key="k", mal_client_id="m")
 
     assert settings.demo is False
+
+
+def test_host_and_port_defaults():
+    settings = Settings(_env_file=None, demo=True)
+
+    assert settings.host == "127.0.0.1"
+    assert settings.port == 8000
+
+
+def test_host_and_port_are_read_from_the_environment(monkeypatch):
+    monkeypatch.setenv("HOST", "0.0.0.0")
+    monkeypatch.setenv("PORT", "9000")
+
+    settings = Settings(_env_file=None, demo=True)
+
+    assert settings.host == "0.0.0.0"
+    assert settings.port == 9000
