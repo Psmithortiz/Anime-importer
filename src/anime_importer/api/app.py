@@ -17,6 +17,7 @@ from anime_importer.api.registry import (
     SessionRegistry,
 )
 from anime_importer.api.schemas import (
+    AppInfo,
     ChooseManyRequest,
     ChooseRequest,
     CreateSessionRequest,
@@ -61,12 +62,16 @@ def get_managed(session_id: str, registry: RegistryDep) -> ManagedSession:
 ManagedDep = Annotated[ManagedSession, Depends(get_managed)]
 
 
-def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
+def create_app(
+    session_factory: SessionFactory | None = None, demo_text: str | None = None
+) -> FastAPI:
     if session_factory is None:
         from anime_importer.bootstrap import build_session
         from anime_importer.config import Settings
 
         settings = Settings()
+        if settings.demo:
+            demo_text = (settings.demo_data_dir / "list.txt").read_text(encoding="utf-8")
 
         def session_factory(titles):
             return build_session(settings, titles)
@@ -76,6 +81,10 @@ def create_app(session_factory: SessionFactory | None = None) -> FastAPI:
         description="Normalize a messy anime list with Gemini and import it into MyAnimeList.",
     )
     app.state.registry = SessionRegistry(session_factory)
+
+    @app.get("/api/info", response_model=AppInfo, tags=["meta"], summary="App mode info")
+    def info() -> AppInfo:
+        return AppInfo(demo=demo_text is not None, sample_text=demo_text)
 
     # All endpoints are `def` (not `async def`): they call blocking code and FastAPI
     # runs them in a threadpool; with async def they would freeze the event loop and the polling.
