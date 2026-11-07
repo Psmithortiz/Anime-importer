@@ -1,5 +1,7 @@
 # Anime Importer
 
+[![CI](https://github.com/Psmithortiz/Anime-importer/actions/workflows/ci.yml/badge.svg)](https://github.com/Psmithortiz/Anime-importer/actions/workflows/ci.yml)
+
 Turn a messy, hand-written anime list into a clean [MyAnimeList](https://myanimelist.net/) import file.
 
 Gemini normalizes each line (typos, mixed Spanish/English/romaji, personal notes like `S2 ***` or
@@ -139,6 +141,19 @@ external APIs is inserted with `textContent`, never `innerHTML`, to rule out XSS
 
 Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
+### Quick run (no clone)
+
+With [uv](https://docs.astral.sh/uv/) installed, you can run the web UI straight from GitHub:
+
+```bash
+uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
+```
+
+Run it from a folder that contains your `.env` file (see below): settings are read from the
+current directory, and the normalization cache is created there too.
+
+### From source
+
 ```bash
 git clone https://github.com/Psmithortiz/Anime-importer
 cd Anime-importer
@@ -192,6 +207,8 @@ uv run ruff check src tests
 
 The suite (238 tests) runs without network access, API keys or real waits: adapters accept injected
 sessions, clients, clocks and sleep functions.
+
+CI runs both commands on Ubuntu and Windows for every pull request.
 
 ## Roadmap
 
