@@ -31,3 +31,19 @@ jobs:
         run: uv run ruff check src tests
       - name: Test
         run: uv run pytest
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t anime-importer .
+      - name: Smoke test in demo mode
+        run: |
+          docker run -d --name app -p 8000:8000 -e DEMO=1 anime-importer
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/info; then exit 0; fi
+            sleep 1
+          done
+          docker logs app
+          exit 1
