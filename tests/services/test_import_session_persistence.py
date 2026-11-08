@@ -482,3 +482,103 @@ def test_persistence_error_in_the_worker_surfaces_as_resolution_error():
 
     assert isinstance(info.value.__cause__, PersistenceError)
     assert repository.load("s").resolutions == ()
+
+
+# ------------------------------------------------------------------ atomic publication
+
+
+def _recording_apply(session, seen):
+    original = session._apply_decision
+
+    def wrapper(work, decision):
+        seen.append(session.snapshot())
+        return original(work, decision)
+
+    session._apply_decision = wrapper
+
+
+def test_undo_never_exposes_intermediate_state():
+    searcher = RecordingSearcher({f"q{n}": tie(f"q{n}", n * 10) for n in range(4)})
+    session = make_session(
+        [f"q{n}" for n in range(4)], PlainNormalizer(), searcher, run_in_background=sync
+    )
+    session.start()
+    for _ in range(4):
+        session.choose(1)
+    before = session.snapshot()
+    assert isinstance(before.current, Finished)
+    seen: list = []
+    _recording_apply(session, seen)
+
+    after_undo = session.undo()
+
+    assert len(seen) == 3  # the three remaining decisions were replayed
+    assert all(snapshot == before for snapshot in seen)
+    after = session.snapshot()
+    assert after != before
+    assert after.current == after_undo
+    assert after.position == 3
+
+
+def test_resumed_start_never_exposes_intermediate_state():
+    repository = InMemorySessionRepository()
+    searcher = RecordingSearcher({f"q{n}": tie(f"q{n}", n * 10) for n in range(3)})
+    first = make_session(
+        [f"q{n}" for n in range(3)],
+        PlainNormalizer(),
+        searcher,
+        repository=repository,
+        session_id="s",
+        run_in_background=sync,
+    )
+    first.start()
+    first.choose(1)
+    first.choose(2)
+    resumed = resume(repository, searcher=searcher)
+    seen: list = []
+    _recording_apply(resumed, seen)
+
+    step = resumed.start()
+
+    assert len(seen) == 2
+    assert all(snapshot.current is None for snapshot in seen)
+    assert resumed.snapshot().current == step
+    assert resumed.snapshot().position == 2
+
+
+def test_failure_in_the_middle_of_an_action_leaves_the_snapshot_untouched():
+    class BrokenSearcher(RecordingSearcher):
+        def search(self, query):
+            if query == "Auto":
+                raise RuntimeError("boom")
+            return super().search(query)
+
+    repository = InMemorySessionRepository()
+    session = make_session(
+        ["Tie", "Auto"],
+        PlainNormalizer(),
+        BrokenSearcher({"Tie": tie("Tie", 10)}),
+        repository=repository,
+        session_id="s",
+        run_in_background=sync,
+    )
+    session.start()
+    before = session.snapshot()
+
+    with pytest.raises(ResolutionError):
+        session.choose(1)  # advancing needs the resolution that the worker could not produce
+
+    assert session.snapshot() == before
+    assert session.progress == (0, 2)
+    assert repository.load("s").decisions == ()  # the unapplied decision was taken back
+
+
+def test_snapshot_is_consistent_and_frozen():
+    session, _ = _undo_session()
+    session.start()
+
+    snap = session.snapshot()
+
+    assert snap.total == 5
+    assert snap.position == 0
+    assert snap.current == session.current

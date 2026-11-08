@@ -1,5 +1,7 @@
 import threading
 from collections.abc import Callable, Sequence
+from contextlib import suppress
+from dataclasses import dataclass, field
 from typing import Any, Self
 
 from anime_importer.domain.matching import match_candidates
@@ -67,6 +69,28 @@ def _same_query(a: str, b: str) -> bool:
     return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
 
 
+@dataclass(frozen=True, slots=True)
+class SessionSnapshot:
+    """Consistent view of the consumer state, safe to read without a lock."""
+
+    position: int
+    total: int
+    current: Step | None
+
+
+@dataclass(slots=True)
+class _Cursor:
+    """Consumer-side state. Once published as `ImportSession._cursor` it is never mutated."""
+
+    position: int = 0
+    imported: list[ImportedAnime] = field(default_factory=list)
+    rejected: list[RejectedTitle] = field(default_factory=list)
+    current: Step | None = None
+
+    def clone(self) -> "_Cursor":
+        return _Cursor(self.position, list(self.imported), list(self.rejected), self.current)
+
+
 def _start_thread(work: Callable[[], None]) -> None:
     threading.Thread(target=work, daemon=True).start()
 
@@ -108,10 +132,11 @@ class ImportSession:
         )
         self._answers: dict[tuple[int, str], Resolution] = dict(stored.answers)
         self._decisions: list[tuple[int, Decision]] = list(stored.decisions)
-        self._position = 0
-        self._imported: list[ImportedAnime] = []
-        self._rejected: list[RejectedTitle] = []
-        self._current: Step | None = None
+        # RULE: a published cursor is NEVER mutated. Every action works on a copy
+        # (`work = self._cursor.clone()`, or a fresh _Cursor when replaying) and publishes it with
+        # ONE assignment (`self._cursor = work`) once it succeeded. Readers without a lock
+        # (snapshot/current/progress) read `self._cursor` once into a local variable.
+        self._cursor = _Cursor()
         self._normalization_progress: tuple[int, int] | None = None
         # Shared with the worker: only the worker appends to _resolutions.
         self._cond = threading.Condition()
@@ -141,14 +166,20 @@ class ImportSession:
 
     @property
     def current(self) -> Step:
-        if self._current is None:
+        current = self._cursor.current
+        if current is None:
             raise RuntimeError("The session has not started: call start()")
-        return self._current
+        return current
 
     @property
     def progress(self) -> tuple[int, int]:
         """(resolved titles, total)."""
-        return self._position, len(self._titles)
+        return self._cursor.position, len(self._titles)
+
+    def snapshot(self) -> SessionSnapshot:
+        """Position, total and current step, all taken from the same published cursor."""
+        cursor = self._cursor
+        return SessionSnapshot(cursor.position, len(self._titles), cursor.current)
 
     @property
     def normalization_progress(self) -> tuple[int, int] | None:
@@ -175,7 +206,7 @@ class ImportSession:
         resolution fails before the first question, and PersistenceError if the repository
         fails or the stored decisions do not match the session.
         """
-        if self._current is not None:
+        if self._cursor.current is not None:
             raise RuntimeError("The session has already started")
         if not self._normalized:
             normalized = self._normalizer.normalize(
@@ -197,18 +228,19 @@ class ImportSession:
 
     def choose(self, option_number: int) -> Step:
         """Answer the current question by choosing option `option_number` (1-based)."""
-        step = self._pending_question()
+        cursor = self._cursor
+        step = self._pending_question(cursor)
         if not 1 <= option_number <= len(step.options):
             raise ValueError(f"Option out of range: {option_number}")
         index = option_number - 1
         decision: Decision
         if isinstance(step, NormalizationChoice):
             query = step.options[index]
-            key = (self._position, query)
+            key = (cursor.position, query)
             if key not in self._answers:
                 # The user changed the query: resolve it now, in the caller's thread.
                 resolution = self._resolve_query(step.original_title, query)
-                self._repository.save_answer(self._id, self._position, query, resolution)
+                self._repository.save_answer(self._id, cursor.position, query, resolution)
                 self._answers[key] = resolution
             decision = PickQuery(query)
         else:
@@ -222,7 +254,7 @@ class ImportSession:
         Selections are (mal_id, status) pairs; a mal_id may belong to the options or to the
         franchise. Only valid for CandidateChoice. On a ValueError the session does not change.
         """
-        step = self._pending_question()
+        step = self._pending_question(self._cursor)
         if not isinstance(step, CandidateChoice):
             raise ValueError("choose_many only applies to candidate questions")  # noqa: TRY004
         if not selections:
@@ -240,7 +272,7 @@ class ImportSession:
 
     def discard(self) -> Step:
         """Discard the title of the current question."""
-        self._pending_question()
+        self._pending_question(self._cursor)
         return self._record(Discard())
 
     def undo(self) -> Step:
@@ -258,50 +290,64 @@ class ImportSession:
         self._decisions.pop()
         return self._replay()
 
-    def _pending_question(self) -> NormalizationChoice | CandidateChoice:
-        step = self.current
+    def _pending_question(self, cursor: _Cursor) -> NormalizationChoice | CandidateChoice:
+        step = cursor.current
+        if step is None:
+            raise RuntimeError("The session has not started: call start()")
         if isinstance(step, Finished):
             raise RuntimeError("The import has already finished")  # noqa: TRY004
         return step
 
     def _record(self, decision: Decision) -> Step:
-        """Persist a decision, then apply it. Nothing is applied if it cannot be saved."""
-        position = self._position
+        """Persist a decision, then apply it to a copy and publish it.
+
+        Nothing is applied if it cannot be saved; if applying fails, the decision is taken back
+        and the published cursor stays as it was.
+        """
+        cursor = self._cursor
+        position = cursor.position
         self._repository.add_decision(self._id, position, decision)
         self._decisions.append((position, decision))
-        return self._apply_decision(decision)
+        work = cursor.clone()
+        try:
+            step = self._apply_decision(work, decision)
+        except BaseException:
+            self._decisions.pop()
+            with suppress(PersistenceError):
+                self._repository.remove_last_decision(self._id)
+            raise
+        self._cursor = work
+        return step
 
     # ------------------------------------------------------------------ replay
 
     def _replay(self) -> Step:
         """Rebuild the consumer state from the resolutions and the stored decisions."""
-        self._position = 0
-        self._imported = []
-        self._rejected = []
-        self._current = None
-        step = self._advance()
+        work = _Cursor()
+        step = self._advance(work)
         for position, decision in self._decisions:
-            if isinstance(step, Finished) or self._position != position:
+            if isinstance(step, Finished) or work.position != position:
                 raise PersistenceError(_MISMATCH)
-            step = self._apply_decision(decision)
+            step = self._apply_decision(work, decision)
+        self._cursor = work
         return step
 
-    def _apply_decision(self, decision: Decision) -> Step:
+    def _apply_decision(self, work: _Cursor, decision: Decision) -> Step:
         """Apply an already persisted and validated decision.
 
-        Never touches the repository nor the searcher.
+        Mutates only `work`; never touches the repository nor the searcher.
         """
-        step = self._current
+        step = work.current
         if step is None or isinstance(step, Finished):
             raise PersistenceError(_MISMATCH)
         match decision:
             case PickQuery(query):
-                resolution = self._answers.get((self._position, query))
+                resolution = self._answers.get((work.position, query))
                 if not isinstance(step, NormalizationChoice) or resolution is None:
                     raise PersistenceError(_MISMATCH)
-                question = self._apply(resolution, step.original_title)
+                question = self._apply(work, resolution, step.original_title)
                 if question is not None:
-                    self._current = question
+                    work.current = question
                     return question
             case PickCandidates(selections):
                 if not isinstance(step, CandidateChoice):
@@ -311,7 +357,7 @@ class ImportSession:
                     raise PersistenceError(_MISMATCH)
                 for mal_id, status in selections:
                     chosen = available[mal_id]
-                    self._imported.append(
+                    work.imported.append(
                         ImportedAnime(mal_id=chosen.mal_id, title=chosen.title, list_status=status)
                     )
             case Discard():
@@ -319,9 +365,9 @@ class ImportSession:
                     reason = "Discarded in normalization menu"
                 else:
                     reason = f"Discarded in search menu (query: {step.query})"
-                self._reject(step.original_title, reason)
-        self._position += 1
-        return self._advance()
+                self._reject(work, step.original_title, reason)
+        work.position += 1
+        return self._advance(work)
 
     # ------------------------------------------------------------------ worker side
 
@@ -412,22 +458,22 @@ class ImportSession:
 
     # ------------------------------------------------------------------ consumer side
 
-    def _advance(self) -> Step:
+    def _advance(self, work: _Cursor) -> Step:
         """Consume resolutions in order until a question or the end. Never searches."""
-        while self._position < len(self._titles):
-            resolution = self._wait_for_resolution(self._position)
-            question = self._apply(resolution, self._titles[self._position])
+        while work.position < len(self._titles):
+            resolution = self._wait_for_resolution(work.position)
+            question = self._apply(work, resolution, self._titles[work.position])
             if question is not None:
-                self._current = question
+                work.current = question
                 return question
-            self._position += 1
+            work.position += 1
         # If the same anime was imported several times, the last one wins.
-        unique = {entry.mal_id: entry for entry in self._imported}
-        self._current = Finished(
+        unique = {entry.mal_id: entry for entry in work.imported}
+        work.current = Finished(
             imported=tuple(unique.values()),
-            rejected=tuple(sorted(self._rejected, key=lambda r: r.reason)),
+            rejected=tuple(sorted(work.rejected, key=lambda r: r.reason)),
         )
-        return self._current
+        return work.current
 
     def _wait_for_resolution(self, index: int) -> Resolution:
         with self._cond:
@@ -441,17 +487,18 @@ class ImportSession:
             ) from self._worker_error
 
     def _apply(
-        self, resolution: Resolution, original: str
+        self, work: _Cursor, resolution: Resolution, original: str
     ) -> NormalizationChoice | CandidateChoice | None:
-        """Record a resolution; return the question if it needs the user."""
+        """Record a resolution on `work`; return the question if it needs the user."""
         match resolution:
             case Imported(entry):
-                self._imported.append(entry)
+                work.imported.append(entry)
             case Rejected(reason):
-                self._reject(original, reason)
+                self._reject(work, original, reason)
             case Ask(question):
                 return question
         return None
 
-    def _reject(self, original: str, reason: str) -> None:
-        self._rejected.append(RejectedTitle(original_title=original, reason=reason))
+    @staticmethod
+    def _reject(work: _Cursor, original: str, reason: str) -> None:
+        work.rejected.append(RejectedTitle(original_title=original, reason=reason))

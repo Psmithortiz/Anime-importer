@@ -76,9 +76,15 @@ class ManagedSession:
         return step
 
     def view(self) -> SessionView:
-        """Does not take the lock: run_start holds it for minutes and would block polling."""
+        """Does not take the lock: run_start holds it for minutes and would block polling.
+
+        Reads one snapshot of the session; for "question"/"finished" the reported status is
+        derived from that snapshot so status and content always agree.
+        """
+        snap = self.session.snapshot()
         status = self.status
-        done, total = self.session.progress
+        if status in ("question", "finished") and snap.current is not None:
+            status = "finished" if isinstance(snap.current, Finished) else "question"
         question = None
         summary = None
         normalization = None
@@ -91,11 +97,11 @@ class ManagedSession:
             if looked_up is not None:
                 resolution = ProgressOut(done=looked_up[0], total=looked_up[1])
         elif status == "question":
-            step = self.session.current
-            if not isinstance(step, Finished):
+            step = snap.current
+            if step is not None and not isinstance(step, Finished):
                 question = question_out(step)
         elif status == "finished":
-            step = self.session.current
+            step = snap.current
             if isinstance(step, Finished):
                 counts = Counter(entry.list_status for entry in step.imported)
                 summary = SummaryOut(
@@ -108,7 +114,7 @@ class ManagedSession:
         return SessionView(
             id=self.id,
             status=status,
-            progress=ProgressOut(done=done, total=total),
+            progress=ProgressOut(done=snap.position, total=snap.total),
             normalization=normalization,
             resolution=resolution,
             error=self.error,
