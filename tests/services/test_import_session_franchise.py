@@ -1,4 +1,5 @@
 import pytest
+from session_helpers import make_session
 
 from anime_importer.domain.models import (
     AnimeCandidate,
@@ -10,7 +11,6 @@ from anime_importer.domain.models import (
     RelationType,
 )
 from anime_importer.domain.session import CandidateChoice, Finished
-from anime_importer.services.import_session import ImportSession
 
 
 class FakeNormalizer:
@@ -42,7 +42,7 @@ TIE = [AnimeCandidate(10, "Hellsing"), AnimeCandidate(20, "Hellsing")]
 
 
 def _session(results, finder):
-    return ImportSession(
+    return make_session(
         ["Hellsing"],
         FakeNormalizer(),
         FakeSearcher(results),

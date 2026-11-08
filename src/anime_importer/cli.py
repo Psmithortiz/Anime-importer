@@ -1,5 +1,6 @@
 import argparse
 import logging
+import uuid
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -67,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     titles = read_titles(input_path)
     try:
-        session = build_session(settings, titles, with_franchise=False)
+        session = build_session(settings, uuid.uuid4().hex, titles, with_franchise=False)
     except ValueError as exc:
         logger.error("%s: %s", input_path, exc)
         return 1

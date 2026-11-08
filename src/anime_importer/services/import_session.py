@@ -1,5 +1,6 @@
 import threading
 from collections.abc import Callable, Sequence
+from typing import Any, Self
 
 from anime_importer.domain.matching import match_candidates
 from anime_importer.domain.models import (
@@ -14,14 +15,25 @@ from anime_importer.domain.models import (
 from anime_importer.domain.session import (
     Ask,
     CandidateChoice,
+    Decision,
+    Discard,
     Finished,
     Imported,
     NormalizationChoice,
+    PickCandidates,
+    PickQuery,
     Rejected,
     Resolution,
     Step,
+    StoredSession,
 )
-from anime_importer.ports import AnimeSearcher, SearchError, TitleNormalizer
+from anime_importer.ports import (
+    AnimeSearcher,
+    PersistenceError,
+    SearchError,
+    SessionRepository,
+    TitleNormalizer,
+)
 
 
 class ResolutionError(Exception):
@@ -30,6 +42,17 @@ class ResolutionError(Exception):
 
 FranchiseFinder = Callable[[Sequence[int]], Franchise]
 BackgroundRunner = Callable[[Callable[[], None]], None]
+
+
+_MISMATCH = "stored decisions do not match the session"
+
+
+def _available_candidates(step: CandidateChoice) -> dict[int, AnimeCandidate]:
+    """Options of the question plus its franchise, by mal_id (options win)."""
+    available = {candidate.mal_id: candidate for candidate in step.options}
+    for entry in step.franchise.entries:
+        available.setdefault(entry.candidate.mal_id, entry.candidate)
+    return available
 
 
 def _imported_from(candidate: AnimeCandidate) -> ImportedAnime:
@@ -54,26 +77,37 @@ class ImportSession:
     A background worker resolves the titles ahead of the user (search + franchise lookup) and
     appends the results, in order, to a list. The session only consumes that list: advancing
     never calls the searcher or the finder.
+
+    Every fact is saved to the repository BEFORE it is applied: resolutions (worker), search
+    answers and user decisions. The consumer state (position, imported, rejected, current step)
+    is a pure function of the stored resolutions, answers and decisions, so a session can be
+    rebuilt from a StoredSession and its last decision can be undone.
     """
 
     def __init__(
         self,
-        titles: Sequence[str],
+        stored: StoredSession,
+        *,
         normalizer: TitleNormalizer,
         searcher: AnimeSearcher,
+        repository: SessionRepository,
         franchise_finder: FranchiseFinder | None = None,
         resolution_buffer: int = 20,
         run_in_background: BackgroundRunner = _start_thread,
     ) -> None:
-        self._titles = list(titles)
-        if not self._titles:
-            raise ValueError("The title list is empty")
+        self._id = stored.id
+        self._titles = list(stored.titles)
         self._normalizer = normalizer
         self._searcher = searcher
+        self._repository = repository
         self._franchise_finder = franchise_finder
         self._resolution_buffer = resolution_buffer
         self._run_in_background = run_in_background
-        self._normalized: dict[int, NormalizedTitle] = {}
+        self._normalized: dict[int, NormalizedTitle] = (
+            {t.index: t for t in stored.normalized} if stored.normalized else {}
+        )
+        self._answers: dict[tuple[int, str], Resolution] = dict(stored.answers)
+        self._decisions: list[tuple[int, Decision]] = list(stored.decisions)
         self._position = 0
         self._imported: list[ImportedAnime] = []
         self._rejected: list[RejectedTitle] = []
@@ -81,9 +115,29 @@ class ImportSession:
         self._normalization_progress: tuple[int, int] | None = None
         # Shared with the worker: only the worker appends to _resolutions.
         self._cond = threading.Condition()
-        self._resolutions: list[Resolution] = []
+        self._resolutions: list[Resolution] = list(stored.resolutions)
         self._worker_error: BaseException | None = None
         self._worker_started = False
+
+    @classmethod
+    def create(
+        cls,
+        session_id: str,
+        titles: Sequence[str],
+        *,
+        repository: SessionRepository,
+        **deps: Any,
+    ) -> Self:
+        """Register a new session in the repository and build it."""
+        if not titles:
+            raise ValueError("The title list is empty")
+        repository.create(session_id, titles)
+        stored = StoredSession(session_id, tuple(titles), None, (), {}, ())
+        return cls(stored, repository=repository, **deps)
+
+    @property
+    def id(self) -> str:
+        return self._id
 
     @property
     def current(self) -> Step:
@@ -113,27 +167,33 @@ class ImportSession:
         self._normalization_progress = (done, total)
 
     def start(self) -> Step:
-        """Normalize the whole list, start resolving it in the background, and advance to the
-        first question once a buffer of titles is resolved.
+        """Normalize the whole list (unless it is already stored), start resolving the missing
+        titles in the background, wait for a buffer of resolutions and replay the stored
+        decisions up to the first pending question.
 
-        Raises NormalizationError if the normalizer fails, and ResolutionError if the
-        background resolution fails before the first question.
+        Raises NormalizationError if the normalizer fails, ResolutionError if the background
+        resolution fails before the first question, and PersistenceError if the repository
+        fails or the stored decisions do not match the session.
         """
         if self._current is not None:
             raise RuntimeError("The session has already started")
-        normalized = self._normalizer.normalize(
-            self._titles, on_progress=self._set_normalization_progress
-        )
-        self._normalized = {t.index: t for t in normalized}
+        if not self._normalized:
+            normalized = self._normalizer.normalize(
+                self._titles, on_progress=self._set_normalization_progress
+            )
+            self._repository.save_normalization(self._id, normalized)
+            self._normalized = {t.index: t for t in normalized}
         with self._cond:
             self._worker_started = True
-        self._run_in_background(self._work)
+            missing = len(self._resolutions) < len(self._titles)
+        if missing:
+            self._run_in_background(self._work)
         needed = min(self._resolution_buffer, len(self._titles))
         with self._cond:
             self._cond.wait_for(
                 lambda: len(self._resolutions) >= needed or self._worker_error is not None
             )
-        return self._advance()
+        return self._replay()
 
     def choose(self, option_number: int) -> Step:
         """Answer the current question by choosing option `option_number` (1-based)."""
@@ -141,17 +201,20 @@ class ImportSession:
         if not 1 <= option_number <= len(step.options):
             raise ValueError(f"Option out of range: {option_number}")
         index = option_number - 1
+        decision: Decision
         if isinstance(step, NormalizationChoice):
-            # The user changed the query, so this one is resolved now, in the caller's thread.
-            resolution = self._resolve_query(step.original_title, step.options[index])
-            question = self._apply(resolution, step.original_title)
-            if question is not None:
-                self._current = question
-                return question
+            query = step.options[index]
+            key = (self._position, query)
+            if key not in self._answers:
+                # The user changed the query: resolve it now, in the caller's thread.
+                resolution = self._resolve_query(step.original_title, query)
+                self._repository.save_answer(self._id, self._position, query, resolution)
+                self._answers[key] = resolution
+            decision = PickQuery(query)
         else:
-            self._imported.append(_imported_from(step.options[index]))
-        self._position += 1
-        return self._advance()
+            chosen = step.options[index]
+            decision = PickCandidates(((chosen.mal_id, suggest_list_status(chosen.airing_status)),))
+        return self._record(decision)
 
     def choose_many(self, selections: Sequence[tuple[int, ListStatus]]) -> Step:
         """Import several anime of the current question, each with its list status.
@@ -164,33 +227,36 @@ class ImportSession:
             raise ValueError("choose_many only applies to candidate questions")  # noqa: TRY004
         if not selections:
             raise ValueError("You must choose at least one option")
-        available = {candidate.mal_id: candidate for candidate in step.options}
-        for entry in step.franchise.entries:
-            available.setdefault(entry.candidate.mal_id, entry.candidate)
+        available = _available_candidates(step)
         ids = [mal_id for mal_id, _ in selections]
         if len(set(ids)) != len(ids):
             raise ValueError("Repeated selections")
         for mal_id in ids:
             if mal_id not in available:
                 raise ValueError(f"Unknown MAL id for this question: {mal_id}")
-        for mal_id, status in selections:
-            chosen = available[mal_id]
-            self._imported.append(
-                ImportedAnime(mal_id=chosen.mal_id, title=chosen.title, list_status=status)
-            )
-        self._position += 1
-        return self._advance()
+        return self._record(
+            PickCandidates(tuple((mal_id, status) for mal_id, status in selections))
+        )
 
     def discard(self) -> Step:
         """Discard the title of the current question."""
-        step = self._pending_question()
-        if isinstance(step, NormalizationChoice):
-            reason = "Discarded in normalization menu"
-        else:
-            reason = f"Discarded in search menu (query: {step.query})"
-        self._reject(step.original_title, reason)
-        self._position += 1
-        return self._advance()
+        self._pending_question()
+        return self._record(Discard())
+
+    def undo(self) -> Step:
+        """Undo the last decision and return to the question it answered.
+
+        Titles that resolved on their own have no decision: they are imported again when the
+        stored decisions are replayed. Works from a finished session too. Resolutions and
+        answers are kept, so answering the same normalization option again never searches again.
+        """
+        _ = self.current  # must have started
+        if not self._decisions:
+            raise ValueError("Nothing to undo")
+        if not self._repository.remove_last_decision(self._id):
+            raise PersistenceError(_MISMATCH)
+        self._decisions.pop()
+        return self._replay()
 
     def _pending_question(self) -> NormalizationChoice | CandidateChoice:
         step = self.current
@@ -198,13 +264,78 @@ class ImportSession:
             raise RuntimeError("The import has already finished")  # noqa: TRY004
         return step
 
+    def _record(self, decision: Decision) -> Step:
+        """Persist a decision, then apply it. Nothing is applied if it cannot be saved."""
+        position = self._position
+        self._repository.add_decision(self._id, position, decision)
+        self._decisions.append((position, decision))
+        return self._apply_decision(decision)
+
+    # ------------------------------------------------------------------ replay
+
+    def _replay(self) -> Step:
+        """Rebuild the consumer state from the resolutions and the stored decisions."""
+        self._position = 0
+        self._imported = []
+        self._rejected = []
+        self._current = None
+        step = self._advance()
+        for position, decision in self._decisions:
+            if isinstance(step, Finished) or self._position != position:
+                raise PersistenceError(_MISMATCH)
+            step = self._apply_decision(decision)
+        return step
+
+    def _apply_decision(self, decision: Decision) -> Step:
+        """Apply an already persisted and validated decision.
+
+        Never touches the repository nor the searcher.
+        """
+        step = self._current
+        if step is None or isinstance(step, Finished):
+            raise PersistenceError(_MISMATCH)
+        match decision:
+            case PickQuery(query):
+                resolution = self._answers.get((self._position, query))
+                if not isinstance(step, NormalizationChoice) or resolution is None:
+                    raise PersistenceError(_MISMATCH)
+                question = self._apply(resolution, step.original_title)
+                if question is not None:
+                    self._current = question
+                    return question
+            case PickCandidates(selections):
+                if not isinstance(step, CandidateChoice):
+                    raise PersistenceError(_MISMATCH)
+                available = _available_candidates(step)
+                if any(mal_id not in available for mal_id, _ in selections):
+                    raise PersistenceError(_MISMATCH)
+                for mal_id, status in selections:
+                    chosen = available[mal_id]
+                    self._imported.append(
+                        ImportedAnime(mal_id=chosen.mal_id, title=chosen.title, list_status=status)
+                    )
+            case Discard():
+                if isinstance(step, NormalizationChoice):
+                    reason = "Discarded in normalization menu"
+                else:
+                    reason = f"Discarded in search menu (query: {step.query})"
+                self._reject(step.original_title, reason)
+        self._position += 1
+        return self._advance()
+
     # ------------------------------------------------------------------ worker side
 
     def _work(self) -> None:
-        """Resolve every title in order. Runs in the background; never mutates the results."""
+        """Resolve the missing titles in order. Runs in the background.
+
+        It never mutates the consumer state. Each resolution is saved before it is published.
+        """
         try:
-            for position, original in enumerate(self._titles):
-                resolution = self._resolve(original, self._normalized.get(position + 1))
+            for position in range(len(self._resolutions), len(self._titles)):
+                resolution = self._resolve(
+                    self._titles[position], self._normalized.get(position + 1)
+                )
+                self._repository.add_resolution(self._id, position, resolution)
                 with self._cond:
                     self._resolutions.append(resolution)
                     self._cond.notify_all()

@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from session_helpers import make_session
 
 from anime_importer.api.app import create_app
 from anime_importer.domain.models import (
@@ -10,7 +11,6 @@ from anime_importer.domain.models import (
     NormalizedTitle,
     RelationType,
 )
-from anime_importer.services.import_session import ImportSession
 
 SEQUEL = AnimeCandidate(
     30,
@@ -35,8 +35,8 @@ class FakeSearcher:
 
 
 def _client() -> TestClient:
-    def factory(titles):
-        return ImportSession(
+    def factory(session_id, titles):
+        return make_session(
             titles,
             FakeNormalizer(),
             FakeSearcher(),

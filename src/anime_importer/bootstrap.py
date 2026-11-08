@@ -12,10 +12,16 @@ from anime_importer.adapters.details_cache import CachingDetailsProvider
 from anime_importer.adapters.gemini import GeminiNormalizer, cache_version
 from anime_importer.adapters.http import Throttle
 from anime_importer.adapters.mal import MalDetailsProvider, MalSearcher
+from anime_importer.adapters.memory_repository import InMemorySessionRepository
 from anime_importer.adapters.normalization_cache import CachingNormalizer, JsonCacheStore
 from anime_importer.config import Settings
 from anime_importer.domain.models import Franchise
-from anime_importer.ports import AnimeDetailsProvider, AnimeSearcher, TitleNormalizer
+from anime_importer.ports import (
+    AnimeDetailsProvider,
+    AnimeSearcher,
+    SessionRepository,
+    TitleNormalizer,
+)
 from anime_importer.services.franchise import discover_franchise
 from anime_importer.services.import_session import FranchiseFinder, ImportSession
 
@@ -51,7 +57,11 @@ def build_real_adapters(
 
 
 def build_session(
-    settings: Settings, titles: Sequence[str], with_franchise: bool = True
+    settings: Settings,
+    session_id: str,
+    titles: Sequence[str],
+    with_franchise: bool = True,
+    repository: SessionRepository | None = None,
 ) -> ImportSession:
     """Composition root: the only place that decides which concrete adapters are used."""
     normalizer: TitleNormalizer
@@ -73,8 +83,10 @@ def build_session(
             return discover_franchise(seed_ids, provider, settings.franchise_max_nodes)
 
         finder = find_franchise
-    return ImportSession(
+    return ImportSession.create(
+        session_id,
         titles,
+        repository=repository if repository is not None else InMemorySessionRepository(),
         normalizer=normalizer,
         searcher=searcher,
         franchise_finder=finder,

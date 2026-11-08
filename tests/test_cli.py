@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from session_helpers import make_session
+
 from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
@@ -18,7 +20,7 @@ class FakeSearcher:
 
 
 def _session() -> ImportSession:
-    return ImportSession(
+    return make_session(
         ["hellsing"], FakeNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
     )
 
@@ -107,7 +109,7 @@ def test_main_writes_xml_with_update_on_import_one(monkeypatch, tmp_path):
     monkeypatch.setenv("MAL_CLIENT_ID", "m")
     monkeypatch.setattr(
         "anime_importer.cli.build_session",
-        lambda settings, titles, with_franchise=True: ImportSession(
+        lambda settings, session_id, titles, with_franchise=True: make_session(
             titles, _AutoNormalizer(), _AutoSearcher(), run_in_background=lambda fn: fn()
         ),
     )

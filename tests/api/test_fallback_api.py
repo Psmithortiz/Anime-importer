@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
+from session_helpers import make_session
 
 from anime_importer.api.app import create_app
 from anime_importer.domain.models import AnimeCandidate, NormalizedTitle
-from anime_importer.services.import_session import ImportSession
 
 TIE = [AnimeCandidate(10, "Hellsing"), AnimeCandidate(20, "Hellsing")]
 
@@ -18,8 +18,8 @@ class OriginalOnlySearcher:
 
 
 def _question(normalizer, searcher):
-    def factory(titles):
-        return ImportSession(titles, normalizer, searcher, run_in_background=lambda fn: fn())
+    def factory(session_id, titles):
+        return make_session(titles, normalizer, searcher, run_in_background=lambda fn: fn())
 
     client = TestClient(create_app(factory))
     session_id = client.post("/api/sessions", json={"text": "hellsing"}).json()["id"]

@@ -27,7 +27,7 @@ def settings(tmp_path):
 def test_without_franchise_no_details_provider_is_created(monkeypatch, settings):
     monkeypatch.setattr(bootstrap, "MalDetailsProvider", RecordingDetails)
 
-    session = bootstrap.build_session(settings, ["a"], with_franchise=False)
+    session = bootstrap.build_session(settings, "id", ["a"], with_franchise=False)
 
     assert RecordingDetails.created == 0
     assert session._franchise_finder is None
@@ -36,7 +36,7 @@ def test_without_franchise_no_details_provider_is_created(monkeypatch, settings)
 def test_with_franchise_builds_a_finder(monkeypatch, settings):
     monkeypatch.setattr(bootstrap, "MalDetailsProvider", RecordingDetails)
 
-    session = bootstrap.build_session(settings, ["a"])
+    session = bootstrap.build_session(settings, "id", ["a"])
 
     assert RecordingDetails.created == 1
     assert session._franchise_finder is not None
@@ -47,7 +47,7 @@ def test_cli_builds_session_without_franchise(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_build(settings, titles, with_franchise=True):
+    def fake_build(settings, session_id, titles, with_franchise=True):
         calls.append(with_franchise)
         raise ValueError("stop here")
 
@@ -76,7 +76,7 @@ def test_demo_session_needs_no_keys_nor_real_adapters(monkeypatch, tmp_path):
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
     settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path, demo_delay_seconds=0)
 
-    session = bootstrap.build_session(settings, ["a"])
+    session = bootstrap.build_session(settings, "id", ["a"])
 
     assert session._franchise_finder is not None
 
@@ -85,6 +85,6 @@ def test_demo_session_without_franchise_has_no_finder(tmp_path):
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
     settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path)
 
-    session = bootstrap.build_session(settings, ["a"], with_franchise=False)
+    session = bootstrap.build_session(settings, "id", ["a"], with_franchise=False)
 
     assert session._franchise_finder is None

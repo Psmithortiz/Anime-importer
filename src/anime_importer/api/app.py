@@ -73,8 +73,8 @@ def create_app(
         if settings.demo:
             demo_text = (settings.demo_data_dir / "list.txt").read_text(encoding="utf-8")
 
-        def session_factory(titles):
-            return build_session(settings, titles)
+        def session_factory(session_id, titles):
+            return build_session(settings, session_id, titles)
 
     app = FastAPI(
         title="Anime Importer",

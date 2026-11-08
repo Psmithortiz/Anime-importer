@@ -20,7 +20,7 @@ from anime_importer.services.import_session import ImportSession, ResolutionErro
 
 logger = logging.getLogger(__name__)
 
-SessionFactory = Callable[[Sequence[str]], ImportSession]
+SessionFactory = Callable[[str, Sequence[str]], ImportSession]
 
 
 class SessionNotFoundError(Exception):
@@ -143,8 +143,9 @@ class SessionRegistry:
         self._lock = threading.Lock()
 
     def create(self, titles: Sequence[str]) -> ManagedSession:
-        session = self._factory(titles)
-        managed = ManagedSession(id=uuid.uuid4().hex, session=session)
+        session_id = uuid.uuid4().hex
+        session = self._factory(session_id, titles)
+        managed = ManagedSession(id=session_id, session=session)
         with self._lock:
             self._sessions[managed.id] = managed
         return managed

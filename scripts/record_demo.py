@@ -13,6 +13,7 @@ would do. The domain and the service stay untouched.
 
 import logging
 import sys
+import uuid
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from anime_importer.adapters.demo import (
     RecordingNormalizer,
     RecordingSearcher,
 )
+from anime_importer.adapters.memory_repository import InMemorySessionRepository
 from anime_importer.bootstrap import build_real_adapters
 from anime_importer.config import Settings
 from anime_importer.domain.matching import match_candidates
@@ -52,8 +54,10 @@ def main() -> int:
         for line in (DEMO_DATA_DIR / "list.txt").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    session = ImportSession(
+    session = ImportSession.create(
+        uuid.uuid4().hex,
         titles,
+        repository=InMemorySessionRepository(),
         normalizer=rec_normalizer,
         searcher=rec_searcher,
         franchise_finder=finder,

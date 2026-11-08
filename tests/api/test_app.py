@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
+from session_helpers import make_session
 
 from anime_importer.api.app import create_app
 from anime_importer.api.registry import ManagedSession
 from anime_importer.domain.models import AiringStatus, AnimeCandidate, MediaType, NormalizedTitle
 from anime_importer.ports import NormalizationError
-from anime_importer.services.import_session import ImportSession
 
 RESULTS = {
     "hellsing": [
@@ -38,8 +38,8 @@ class FakeSearcher:
 
 
 def _client(normalizer=None) -> TestClient:
-    def factory(titles):
-        return ImportSession(
+    def factory(session_id, titles):
+        return make_session(
             titles,
             normalizer or FakeNormalizer(),
             FakeSearcher(),
@@ -295,7 +295,7 @@ def test_final_view_has_no_normalization_progress():
 
 
 def test_view_includes_normalization_progress_while_preparing():
-    session = ImportSession(
+    session = make_session(
         ["a", "b", "c"], ProgressNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
     )
     session.start()  # reports (3, 3)
@@ -314,8 +314,8 @@ class ExplodingSearcher:
 
 
 def test_unexpected_resolution_error_leaves_the_session_failed():
-    def factory(titles):
-        return ImportSession(
+    def factory(session_id, titles):
+        return make_session(
             titles, FakeNormalizer(), ExplodingSearcher(), run_in_background=lambda fn: fn()
         )
 
@@ -335,8 +335,8 @@ def test_choose_that_hits_a_resolution_error_marks_failed_without_raising():
                 raise RuntimeError("boom")
             return RESULTS["hellsing"]
 
-    def factory(titles):
-        return ImportSession(
+    def factory(session_id, titles):
+        return make_session(
             titles, FakeNormalizer(), FlakySearcher(), run_in_background=lambda fn: fn()
         )
 
@@ -351,7 +351,7 @@ def test_choose_that_hits_a_resolution_error_marks_failed_without_raising():
 
 
 def test_view_includes_resolution_progress_while_preparing():
-    session = ImportSession(
+    session = make_session(
         ["a", "b"], FakeNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
     )
     session.start()
