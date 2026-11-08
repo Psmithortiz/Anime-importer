@@ -4,6 +4,7 @@ import uuid
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from anime_importer.api.schemas import (
     ProgressOut,
@@ -14,13 +15,22 @@ from anime_importer.api.schemas import (
     question_out,
 )
 from anime_importer.domain.models import ListStatus
-from anime_importer.domain.session import Finished, Step
-from anime_importer.ports import NormalizationError
-from anime_importer.services.import_session import ImportSession, ResolutionError
+from anime_importer.domain.session import Finished, SessionSummary, Step
+from anime_importer.ports import NormalizationError, PersistenceError
+from anime_importer.services.import_session import (
+    BackgroundRunner,
+    ImportSession,
+    ResolutionError,
+)
+
+if TYPE_CHECKING:
+    from anime_importer.bootstrap import SessionServices
 
 logger = logging.getLogger(__name__)
 
-SessionFactory = Callable[[str, Sequence[str]], ImportSession]
+
+def _start_thread(work: Callable[[], None]) -> None:
+    threading.Thread(target=work, daemon=True).start()
 
 
 class SessionNotFoundError(Exception):
@@ -49,6 +59,10 @@ class ManagedSession:
                 self.status = "failed"
             except ResolutionError:
                 self._fail_resolution()
+            except PersistenceError:
+                logger.exception("Session %s: persistence failed", self.id)
+                self.error = "Could not read or save the session; try again"
+                self.status = "failed"
             except Exception:
                 logger.exception("Session %s failed", self.id)
                 self.error = "Internal error while processing the list"
@@ -68,6 +82,15 @@ class ManagedSession:
         with self.lock:
             self._require("question")
             self._advance_with(self.session.discard)
+
+    def undo(self) -> None:
+        with self.lock:
+            if self.status not in ("question", "finished"):
+                raise InvalidStateError(f"Operation not valid in state '{self.status}'")
+            try:
+                self._advance_with(self.session.undo)
+            except ValueError as exc:
+                raise InvalidStateError(str(exc)) from None
 
     def finished(self) -> Finished:
         self._require("finished")
@@ -120,6 +143,7 @@ class ManagedSession:
             error=self.error,
             question=question,
             summary=summary,
+            can_undo=status in ("question", "finished") and self.session.can_undo,
         )
 
     def _advance_with(self, action: Callable[[], Step]) -> None:
@@ -143,21 +167,54 @@ class ManagedSession:
 
 
 class SessionRegistry:
-    def __init__(self, factory: SessionFactory) -> None:
-        self._factory = factory
+    """Sessions of the app. Sessions not in memory are rebuilt lazily from the repository."""
+
+    def __init__(
+        self, services: "SessionServices", run_in_background: BackgroundRunner = _start_thread
+    ) -> None:
+        self._services = services
+        self._run_in_background = run_in_background
         self._sessions: dict[str, ManagedSession] = {}
         self._lock = threading.Lock()
 
     def create(self, titles: Sequence[str]) -> ManagedSession:
         session_id = uuid.uuid4().hex
-        session = self._factory(session_id, titles)
+        session = self._services.new_session(session_id, titles)
         managed = ManagedSession(id=session_id, session=session)
         with self._lock:
-            self._sessions[managed.id] = managed
+            self._sessions[session_id] = managed
         return managed
 
     def get(self, session_id: str) -> ManagedSession:
-        try:
-            return self._sessions[session_id]
-        except KeyError:
-            raise SessionNotFoundError(session_id) from None
+        managed = self._sessions.get(session_id)
+        if managed is not None:
+            return managed
+        with self._lock:
+            # Another thread may have loaded it while this one waited for the lock.
+            managed = self._sessions.get(session_id)
+            if managed is not None:
+                return managed
+            managed = self._load(session_id)
+            self._sessions[session_id] = managed
+        self._run_in_background(managed.run_start)
+        return managed
+
+    def retry(self, session_id: str) -> ManagedSession:
+        """Rebuild a failed session from the repository and start it again."""
+        current = self.get(session_id)
+        with self._lock:
+            if self._sessions.get(session_id) is not current or current.status != "failed":
+                raise InvalidStateError("Only a failed session can be retried")
+            managed = self._load(session_id)
+            self._sessions[session_id] = managed
+        self._run_in_background(managed.run_start)
+        return managed
+
+    def list_recent(self, limit: int) -> list[SessionSummary]:
+        return self._services.repository.list_recent(limit)
+
+    def _load(self, session_id: str) -> ManagedSession:
+        session = self._services.restore_session(session_id)
+        if session is None:
+            raise SessionNotFoundError(session_id)
+        return ManagedSession(id=session_id, session=session)

@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from session_helpers import make_session
+from session_helpers import make_registry
 
 from anime_importer.api.app import create_app
 from anime_importer.domain.models import (
@@ -35,16 +35,10 @@ class FakeSearcher:
 
 
 def _client() -> TestClient:
-    def factory(session_id, titles):
-        return make_session(
-            titles,
-            FakeNormalizer(),
-            FakeSearcher(),
-            franchise_finder=lambda seeds: FRANCHISE,
-            run_in_background=lambda fn: fn(),
-        )
-
-    return TestClient(create_app(factory))
+    registry = make_registry(
+        FakeNormalizer(), FakeSearcher(), franchise_finder=lambda seeds: FRANCHISE
+    )
+    return TestClient(create_app(registry))
 
 
 def _create(client: TestClient) -> str:

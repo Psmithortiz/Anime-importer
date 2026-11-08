@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -97,6 +98,16 @@ class SessionView(BaseModel):
     error: str | None = None
     question: QuestionOut | None = None
     summary: SummaryOut | None = None
+    can_undo: bool = False
+
+
+class SessionSummaryOut(BaseModel):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    title_count: int
+    preview: list[str]
+    decision_count: int
 
 
 def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:

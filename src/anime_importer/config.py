@@ -1,8 +1,14 @@
 from pathlib import Path
 from typing import Self
 
-from pydantic import model_validator
+from platformdirs import user_data_path
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _data_dir() -> Path:
+    """Per-user data folder. Computing the path does not create it."""
+    return user_data_path("anime-importer", appauthor=False)
 
 
 class Settings(BaseSettings):
@@ -27,6 +33,8 @@ class Settings(BaseSettings):
     demo: bool = False
     demo_delay_seconds: float = 0.3
     demo_data_dir: Path = Path(__file__).parent / "adapters" / "demo_data"
+    database_path: Path = Field(default_factory=lambda: _data_dir() / "sessions.db")
+    demo_database_path: Path = Field(default_factory=lambda: _data_dir() / "demo.db")
 
     @model_validator(mode="after")
     def _require_keys_unless_demo(self) -> Self:

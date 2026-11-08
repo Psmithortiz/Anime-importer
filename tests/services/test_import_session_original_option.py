@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from session_helpers import make_session
+from session_helpers import make_registry, make_session
 
 from anime_importer.api.app import create_app
 from anime_importer.domain.models import AnimeCandidate, NormalizedTitle
@@ -68,10 +68,7 @@ def test_choosing_the_original_option_searches_the_original_line():
 
 
 def test_api_marks_the_original_option():
-    def factory(session_id, titles):
-        return _session(titles[0], ["A", "B"])
-
-    client = TestClient(create_app(factory))
+    client = TestClient(create_app(make_registry(_normalizer(["A", "B"]), Searcher())))
     session_id = client.post("/api/sessions", json={"text": "x"}).json()["id"]
 
     options = client.get(f"/api/sessions/{session_id}").json()["question"]["options"]

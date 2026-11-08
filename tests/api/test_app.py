@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from session_helpers import make_session
+from session_helpers import make_registry, make_session
 
 from anime_importer.api.app import create_app
 from anime_importer.api.registry import ManagedSession
@@ -38,15 +38,7 @@ class FakeSearcher:
 
 
 def _client(normalizer=None) -> TestClient:
-    def factory(session_id, titles):
-        return make_session(
-            titles,
-            normalizer or FakeNormalizer(),
-            FakeSearcher(),
-            run_in_background=lambda fn: fn(),
-        )
-
-    return TestClient(create_app(factory))
+    return TestClient(create_app(make_registry(normalizer or FakeNormalizer(), FakeSearcher())))
 
 
 def _create(client: TestClient, text: str = "hellsing") -> str:
@@ -314,12 +306,7 @@ class ExplodingSearcher:
 
 
 def test_unexpected_resolution_error_leaves_the_session_failed():
-    def factory(session_id, titles):
-        return make_session(
-            titles, FakeNormalizer(), ExplodingSearcher(), run_in_background=lambda fn: fn()
-        )
-
-    client = TestClient(create_app(factory))
+    client = TestClient(create_app(make_registry(FakeNormalizer(), ExplodingSearcher())))
     session_id = client.post("/api/sessions", json={"text": "a"}).json()["id"]
 
     view = client.get(f"/api/sessions/{session_id}").json()
@@ -335,12 +322,7 @@ def test_choose_that_hits_a_resolution_error_marks_failed_without_raising():
                 raise RuntimeError("boom")
             return RESULTS["hellsing"]
 
-    def factory(session_id, titles):
-        return make_session(
-            titles, FakeNormalizer(), FlakySearcher(), run_in_background=lambda fn: fn()
-        )
-
-    client = TestClient(create_app(factory))
+    client = TestClient(create_app(make_registry(FakeNormalizer(), FlakySearcher())))
     session_id = client.post("/api/sessions", json={"text": "hellsing\nb"}).json()["id"]
     assert client.get(f"/api/sessions/{session_id}").json()["status"] == "question"
 
@@ -373,7 +355,9 @@ SAMPLE = "Hellsing" + chr(10) + "Naruto" + chr(10)
 
 
 def test_info_with_demo_text():
-    client = TestClient(create_app(lambda titles: None, demo_text=SAMPLE))
+    client = TestClient(
+        create_app(make_registry(FakeNormalizer(), FakeSearcher()), demo_text=SAMPLE)
+    )
 
     assert client.get("/api/info").json() == {"demo": True, "sample_text": SAMPLE}
 
@@ -383,6 +367,7 @@ class _StubSession:
 
     normalization_progress = None
     resolution_progress = None
+    can_undo = False
 
     def __init__(self, snapshot) -> None:
         self._snapshot = snapshot

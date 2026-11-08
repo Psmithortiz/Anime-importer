@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from anime_importer.adapters.mal_xml import render_mal_xml
@@ -12,7 +13,6 @@ from anime_importer.adapters.text_files import parse_titles
 from anime_importer.api.registry import (
     InvalidStateError,
     ManagedSession,
-    SessionFactory,
     SessionNotFoundError,
     SessionRegistry,
 )
@@ -21,8 +21,12 @@ from anime_importer.api.schemas import (
     ChooseManyRequest,
     ChooseRequest,
     CreateSessionRequest,
+    SessionSummaryOut,
     SessionView,
 )
+from anime_importer.ports import PersistenceError
+
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -62,26 +66,31 @@ def get_managed(session_id: str, registry: RegistryDep) -> ManagedSession:
 ManagedDep = Annotated[ManagedSession, Depends(get_managed)]
 
 
-def create_app(
-    session_factory: SessionFactory | None = None, demo_text: str | None = None
-) -> FastAPI:
-    if session_factory is None:
-        from anime_importer.adapters.memory_repository import InMemorySessionRepository
+def create_app(registry: SessionRegistry | None = None, demo_text: str | None = None) -> FastAPI:
+    if registry is None:
+        from anime_importer.adapters.sqlite_repository import SqliteSessionRepository
         from anime_importer.bootstrap import build_services
         from anime_importer.config import Settings
 
         settings = Settings()
         if settings.demo:
             demo_text = (settings.demo_data_dir / "list.txt").read_text(encoding="utf-8")
-
-        # Adapters (throttle, caches) are built once and shared by every session.
-        session_factory = build_services(settings, InMemorySessionRepository()).new_session
+        database = settings.demo_database_path if settings.demo else settings.database_path
+        # Everything is built ONCE per app: adapters (throttle, caches) are shared by all sessions.
+        registry = SessionRegistry(build_services(settings, SqliteSessionRepository(database)))
 
     app = FastAPI(
         title="Anime Importer",
         description="Normalize a messy anime list with Gemini and import it into MyAnimeList.",
     )
-    app.state.registry = SessionRegistry(session_factory)
+    app.state.registry = registry
+
+    @app.exception_handler(PersistenceError)
+    def persistence_error(request: Request, exc: PersistenceError) -> JSONResponse:
+        logger.error("Persistence error on %s: %s", request.url.path, exc)
+        return JSONResponse(
+            status_code=503, content={"detail": "Could not save the session; try again"}
+        )
 
     @app.get("/api/info", response_model=AppInfo, tags=["meta"], summary="App mode info")
     def info() -> AppInfo:
@@ -105,6 +114,27 @@ def create_app(
             raise HTTPException(status_code=422, detail=str(exc)) from None
         background.add_task(managed.run_start)
         return managed.view()
+
+    @app.get(
+        "/api/sessions",
+        response_model=list[SessionSummaryOut],
+        tags=["sessions"],
+        summary="List recent sessions",
+    )
+    def list_sessions(
+        registry: RegistryDep, limit: Annotated[int, Query(ge=1, le=100)] = 20
+    ) -> list[SessionSummaryOut]:
+        return [
+            SessionSummaryOut(
+                id=item.id,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+                title_count=item.title_count,
+                preview=list(item.preview),
+                decision_count=item.decision_count,
+            )
+            for item in registry.list_recent(limit)
+        ]
 
     @app.get(
         "/api/sessions/{session_id}",
@@ -154,6 +184,35 @@ def create_app(
     def discard(managed: ManagedDep) -> SessionView:
         try:
             managed.discard()
+        except InvalidStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        return managed.view()
+
+    @app.post(
+        "/api/sessions/{session_id}/undo",
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Undo the last decision",
+    )
+    def undo(managed: ManagedDep) -> SessionView:
+        try:
+            managed.undo()
+        except InvalidStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        return managed.view()
+
+    @app.post(
+        "/api/sessions/{session_id}/retry",
+        status_code=202,
+        response_model=SessionView,
+        tags=["sessions"],
+        summary="Rebuild a failed session and start it again",
+    )
+    def retry(session_id: str, registry: RegistryDep) -> SessionView:
+        try:
+            managed = registry.retry(session_id)
+        except SessionNotFoundError:
+            raise HTTPException(status_code=404, detail="Session not found") from None
         except InvalidStateError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from None
         return managed.view()
