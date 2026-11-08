@@ -9,7 +9,7 @@ from anime_importer.domain.models import (
     RelationType,
     suggest_list_status,
 )
-from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
+from anime_importer.domain.session import CandidateChoice, NormalizationChoice
 
 SessionStatus = Literal["preparing", "question", "finished", "failed"]
 

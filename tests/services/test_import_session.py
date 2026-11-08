@@ -7,13 +7,9 @@ from anime_importer.domain.models import (
     ListStatus,
     NormalizedTitle,
 )
+from anime_importer.domain.session import CandidateChoice, Finished, NormalizationChoice
 from anime_importer.ports import SearchError
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-    NormalizationChoice,
-)
+from anime_importer.services.import_session import ImportSession
 
 
 class FakeNormalizer:

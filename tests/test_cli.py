@@ -3,7 +3,8 @@ from pathlib import Path
 from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
-from anime_importer.services.import_session import CandidateChoice, Finished, ImportSession
+from anime_importer.domain.session import CandidateChoice, Finished
+from anime_importer.services.import_session import ImportSession
 
 
 class FakeNormalizer:

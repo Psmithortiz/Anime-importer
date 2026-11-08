@@ -2,11 +2,8 @@ from fastapi.testclient import TestClient
 
 from anime_importer.api.app import create_app
 from anime_importer.domain.models import AnimeCandidate, NormalizedTitle
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    ImportSession,
-    NormalizationChoice,
-)
+from anime_importer.domain.session import CandidateChoice, NormalizationChoice
+from anime_importer.services.import_session import ImportSession
 
 
 def _normalizer(options):

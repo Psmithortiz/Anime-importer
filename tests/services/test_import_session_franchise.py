@@ -9,11 +9,8 @@ from anime_importer.domain.models import (
     NormalizedTitle,
     RelationType,
 )
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-)
+from anime_importer.domain.session import CandidateChoice, Finished
+from anime_importer.services.import_session import ImportSession
 
 
 class FakeNormalizer:

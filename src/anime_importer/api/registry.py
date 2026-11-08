@@ -14,13 +14,9 @@ from anime_importer.api.schemas import (
     question_out,
 )
 from anime_importer.domain.models import ListStatus
+from anime_importer.domain.session import Finished, Step
 from anime_importer.ports import NormalizationError
-from anime_importer.services.import_session import (
-    Finished,
-    ImportSession,
-    ResolutionError,
-    Step,
-)
+from anime_importer.services.import_session import ImportSession, ResolutionError
 
 logger = logging.getLogger(__name__)
 

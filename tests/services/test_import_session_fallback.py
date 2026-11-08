@@ -1,10 +1,7 @@
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
+from anime_importer.domain.session import CandidateChoice, Finished
 from anime_importer.ports import SearchError
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-)
+from anime_importer.services.import_session import ImportSession
 
 
 class Normalizer:

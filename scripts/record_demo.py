@@ -26,14 +26,10 @@ from anime_importer.bootstrap import build_real_adapters
 from anime_importer.config import Settings
 from anime_importer.domain.matching import match_candidates
 from anime_importer.domain.models import Franchise
+from anime_importer.domain.session import CandidateChoice, Finished, NormalizationChoice
 from anime_importer.ports import SearchError
 from anime_importer.services.franchise import discover_franchise
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-    NormalizationChoice,
-)
+from anime_importer.services.import_session import ImportSession
 
 DEMO_DATA_DIR = Path(__file__).resolve().parent.parent / "src/anime_importer/adapters/demo_data"
 

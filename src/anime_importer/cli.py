@@ -7,14 +7,9 @@ from anime_importer.adapters.mal_xml import write_mal_xml
 from anime_importer.adapters.text_files import read_titles, write_rejected_report
 from anime_importer.bootstrap import build_session
 from anime_importer.config import Settings
+from anime_importer.domain.session import CandidateChoice, Finished, NormalizationChoice, Step
 from anime_importer.ports import NormalizationError
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-    NormalizationChoice,
-    Step,
-)
+from anime_importer.services.import_session import ImportSession
 
 logger = logging.getLogger(__name__)
 

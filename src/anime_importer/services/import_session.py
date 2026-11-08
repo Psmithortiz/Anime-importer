@@ -1,6 +1,5 @@
 import threading
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
 
 from anime_importer.domain.matching import match_candidates
 from anime_importer.domain.models import (
@@ -12,6 +11,16 @@ from anime_importer.domain.models import (
     RejectedTitle,
     suggest_list_status,
 )
+from anime_importer.domain.session import (
+    Ask,
+    CandidateChoice,
+    Finished,
+    Imported,
+    NormalizationChoice,
+    Rejected,
+    Resolution,
+    Step,
+)
 from anime_importer.ports import AnimeSearcher, SearchError, TitleNormalizer
 
 
@@ -19,61 +28,8 @@ class ResolutionError(Exception):
     """The background resolution of the titles failed unexpectedly."""
 
 
-@dataclass(frozen=True, slots=True)
-class NormalizationChoice:
-    """The normalizer is unsure: the user picks among possible titles."""
-
-    original_title: str
-    options: tuple[str, ...]
-    original_option: int | None = None  # 1-based number of the option that is the user's line
-
-
-@dataclass(frozen=True, slots=True)
-class CandidateChoice:
-    """The search gave no confident match: the user picks among candidates."""
-
-    original_title: str
-    query: str
-    options: tuple[AnimeCandidate, ...]
-    franchise: Franchise = field(default_factory=Franchise)
-    preselected: frozenset[int] = frozenset()  # mal_ids marked in advance
-    used_fallback: bool = False  # the query is the user's original line, not the normalized one
-
-
-@dataclass(frozen=True, slots=True)
-class Finished:
-    imported: tuple[ImportedAnime, ...]
-    rejected: tuple[RejectedTitle, ...]
-
-
-Step = NormalizationChoice | CandidateChoice | Finished
-
 FranchiseFinder = Callable[[Sequence[int]], Franchise]
 BackgroundRunner = Callable[[Callable[[], None]], None]
-
-
-@dataclass(frozen=True, slots=True)
-class Imported:
-    """The title resolved to an anime on its own."""
-
-    entry: ImportedAnime
-
-
-@dataclass(frozen=True, slots=True)
-class Rejected:
-    """The title cannot be imported."""
-
-    reason: str
-
-
-@dataclass(frozen=True, slots=True)
-class Ask:
-    """The title needs the user to decide."""
-
-    question: NormalizationChoice | CandidateChoice
-
-
-Resolution = Imported | Rejected | Ask
 
 
 def _imported_from(candidate: AnimeCandidate) -> ImportedAnime:

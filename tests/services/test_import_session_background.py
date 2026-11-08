@@ -9,12 +9,8 @@ from anime_importer.domain.models import (
     ListStatus,
     NormalizedTitle,
 )
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-    ResolutionError,
-)
+from anime_importer.domain.session import CandidateChoice, Finished
+from anime_importer.services.import_session import ImportSession, ResolutionError
 
 TIMEOUT = 2.0
 
