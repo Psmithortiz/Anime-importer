@@ -66,15 +66,16 @@ def create_app(
     session_factory: SessionFactory | None = None, demo_text: str | None = None
 ) -> FastAPI:
     if session_factory is None:
-        from anime_importer.bootstrap import build_session
+        from anime_importer.adapters.memory_repository import InMemorySessionRepository
+        from anime_importer.bootstrap import build_services
         from anime_importer.config import Settings
 
         settings = Settings()
         if settings.demo:
             demo_text = (settings.demo_data_dir / "list.txt").read_text(encoding="utf-8")
 
-        def session_factory(session_id, titles):
-            return build_session(settings, session_id, titles)
+        # Adapters (throttle, caches) are built once and shared by every session.
+        session_factory = build_services(settings, InMemorySessionRepository()).new_session
 
     app = FastAPI(
         title="Anime Importer",

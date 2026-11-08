@@ -5,8 +5,9 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from anime_importer.adapters.mal_xml import write_mal_xml
+from anime_importer.adapters.memory_repository import InMemorySessionRepository
 from anime_importer.adapters.text_files import read_titles, write_rejected_report
-from anime_importer.bootstrap import build_session
+from anime_importer.bootstrap import build_services
 from anime_importer.config import Settings
 from anime_importer.domain.session import CandidateChoice, Finished, NormalizationChoice, Step
 from anime_importer.ports import NormalizationError
@@ -68,7 +69,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     titles = read_titles(input_path)
     try:
-        session = build_session(settings, uuid.uuid4().hex, titles, with_franchise=False)
+        services = build_services(settings, InMemorySessionRepository(), with_franchise=False)
+        session = services.new_session(uuid.uuid4().hex, titles)
     except ValueError as exc:
         logger.error("%s: %s", input_path, exc)
         return 1

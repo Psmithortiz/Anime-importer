@@ -1,4 +1,6 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from google import genai
 
@@ -12,7 +14,6 @@ from anime_importer.adapters.details_cache import CachingDetailsProvider
 from anime_importer.adapters.gemini import GeminiNormalizer, cache_version
 from anime_importer.adapters.http import Throttle
 from anime_importer.adapters.mal import MalDetailsProvider, MalSearcher
-from anime_importer.adapters.memory_repository import InMemorySessionRepository
 from anime_importer.adapters.normalization_cache import CachingNormalizer, JsonCacheStore
 from anime_importer.config import Settings
 from anime_importer.domain.models import Franchise
@@ -23,7 +24,11 @@ from anime_importer.ports import (
     TitleNormalizer,
 )
 from anime_importer.services.franchise import discover_franchise
-from anime_importer.services.import_session import FranchiseFinder, ImportSession
+from anime_importer.services.import_session import (
+    BackgroundRunner,
+    FranchiseFinder,
+    ImportSession,
+)
 
 
 def build_real_adapters(
@@ -56,14 +61,46 @@ def build_real_adapters(
     return normalizer, searcher, details
 
 
-def build_session(
-    settings: Settings,
-    session_id: str,
-    titles: Sequence[str],
-    with_franchise: bool = True,
-    repository: SessionRepository | None = None,
-) -> ImportSession:
-    """Composition root: the only place that decides which concrete adapters are used."""
+@dataclass(frozen=True, slots=True)
+class SessionServices:
+    """Adapters shared by every session of the app, built once by `build_services`."""
+
+    repository: SessionRepository
+    normalizer: TitleNormalizer
+    searcher: AnimeSearcher
+    franchise_finder: FranchiseFinder | None
+    resolution_buffer: int
+    run_in_background: BackgroundRunner | None = None  # None: ImportSession's default (a thread)
+
+    def _deps(self) -> dict[str, Any]:
+        deps: dict[str, Any] = {
+            "normalizer": self.normalizer,
+            "searcher": self.searcher,
+            "franchise_finder": self.franchise_finder,
+            "resolution_buffer": self.resolution_buffer,
+        }
+        if self.run_in_background is not None:
+            deps["run_in_background"] = self.run_in_background
+        return deps
+
+    def new_session(self, session_id: str, titles: Sequence[str]) -> ImportSession:
+        return ImportSession.create(session_id, titles, repository=self.repository, **self._deps())
+
+    def restore_session(self, session_id: str) -> ImportSession | None:
+        """Rebuild a stored session, or None if it does not exist."""
+        stored = self.repository.load(session_id)
+        if stored is None:
+            return None
+        return ImportSession(stored, repository=self.repository, **self._deps())
+
+
+def build_services(
+    settings: Settings, repository: SessionRepository, with_franchise: bool = True
+) -> SessionServices:
+    """Composition root: the only place that decides which concrete adapters are used.
+
+    Adapters (and their throttle and caches) are built ONCE and shared by every session.
+    """
     normalizer: TitleNormalizer
     searcher: AnimeSearcher
     details: AnimeDetailsProvider | None
@@ -83,10 +120,8 @@ def build_session(
             return discover_franchise(seed_ids, provider, settings.franchise_max_nodes)
 
         finder = find_franchise
-    return ImportSession.create(
-        session_id,
-        titles,
-        repository=repository if repository is not None else InMemorySessionRepository(),
+    return SessionServices(
+        repository=repository,
         normalizer=normalizer,
         searcher=searcher,
         franchise_finder=finder,

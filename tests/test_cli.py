@@ -2,6 +2,7 @@ from pathlib import Path
 
 from session_helpers import make_session
 
+from anime_importer.bootstrap import SessionServices
 from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
@@ -108,9 +109,14 @@ def test_main_writes_xml_with_update_on_import_one(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setenv("MAL_CLIENT_ID", "m")
     monkeypatch.setattr(
-        "anime_importer.cli.build_session",
-        lambda settings, session_id, titles, with_franchise=True: make_session(
-            titles, _AutoNormalizer(), _AutoSearcher(), run_in_background=lambda fn: fn()
+        "anime_importer.cli.build_services",
+        lambda settings, repository, with_franchise=True: SessionServices(
+            repository=repository,
+            normalizer=_AutoNormalizer(),
+            searcher=_AutoSearcher(),
+            franchise_finder=None,
+            resolution_buffer=20,
+            run_in_background=lambda fn: fn(),
         ),
     )
     titles = tmp_path / "list.txt"
