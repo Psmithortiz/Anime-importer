@@ -1,11 +1,14 @@
-"""Types of an import session: questions and resolutions."""
+"""Types of an import session: questions, resolutions, user decisions and stored snapshots."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from anime_importer.domain.models import (
     AnimeCandidate,
     Franchise,
     ImportedAnime,
+    ListStatus,
+    NormalizedTitle,
     RejectedTitle,
 )
 
@@ -62,3 +65,58 @@ class Ask:
 
 
 Resolution = Imported | Rejected | Ask
+
+
+# ------------------------------------------------------------------ decisions
+# They identify what the user chose by identity (query text, MAL id), never by option number.
+
+
+@dataclass(frozen=True, slots=True)
+class PickQuery:
+    """Answer to a NormalizationChoice: the chosen query."""
+
+    query: str
+
+
+@dataclass(frozen=True, slots=True)
+class PickCandidates:
+    """Answer to a CandidateChoice: (mal_id, status) of every chosen anime."""
+
+    selections: tuple[tuple[int, ListStatus], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Discard:
+    """The user discarded the title."""
+
+
+Decision = PickQuery | PickCandidates | Discard
+
+
+# ------------------------------------------------------------------ stored session
+
+
+@dataclass(frozen=True)
+class StoredSession:
+    """Snapshot of a persisted session.
+
+    Not `slots=True`, and `answers` is a dict: the instance is not hashable. `answers` must not
+    be mutated by callers.
+    """
+
+    id: str
+    titles: tuple[str, ...]
+    normalized: tuple[NormalizedTitle, ...] | None
+    resolutions: tuple[Resolution, ...]  # in position order, no gaps
+    answers: dict[tuple[int, str], Resolution]  # (position, query) -> resolution
+    decisions: tuple[tuple[int, Decision], ...]  # (position, decision) in order
+
+
+@dataclass(frozen=True, slots=True)
+class SessionSummary:
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    title_count: int
+    preview: tuple[str, ...]  # first 3 titles
+    decision_count: int
