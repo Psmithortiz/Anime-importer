@@ -546,7 +546,7 @@ def test_resumed_start_never_exposes_intermediate_state():
     assert resumed.snapshot().position == 2
 
 
-def test_failure_in_the_middle_of_an_action_leaves_the_snapshot_untouched():
+def test_failure_in_the_middle_of_an_action_keeps_the_decision_and_the_snapshot():
     class BrokenSearcher(RecordingSearcher):
         def search(self, query):
             if query == "Auto":
@@ -570,7 +570,28 @@ def test_failure_in_the_middle_of_an_action_leaves_the_snapshot_untouched():
 
     assert session.snapshot() == before
     assert session.progress == (0, 2)
-    assert repository.load("s").decisions == ()  # the unapplied decision was taken back
+    # The saved decision is a fact: it stays in the log...
+    assert repository.load("s").decisions == ((0, PickCandidates(((10, ListStatus.COMPLETED),))),)
+    assert session.can_undo
+
+    # ...and a session rebuilt with a healthy worker applies it.
+    healthy = RecordingSearcher({"Tie": tie("Tie", 10), "Auto": one("Auto", 3)})
+    rebuilt = resume(repository, searcher=healthy, franchise_finder=None)
+    finished = rebuilt.start()
+    assert isinstance(finished, Finished)
+    assert [e.mal_id for e in finished.imported] == [10, 3]
+
+
+def test_can_undo_follows_the_decisions():
+    session, _ = _undo_session()
+    session.start()
+    assert not session.can_undo
+
+    session.choose(1)
+    assert session.can_undo
+
+    session.undo()
+    assert not session.can_undo
 
 
 def test_snapshot_is_consistent_and_frozen():

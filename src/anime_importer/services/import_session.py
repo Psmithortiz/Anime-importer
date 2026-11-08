@@ -1,6 +1,5 @@
 import threading
 from collections.abc import Callable, Sequence
-from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Any, Self
 
@@ -172,6 +171,11 @@ class ImportSession:
         return current
 
     @property
+    def can_undo(self) -> bool:
+        """Whether there is a decision to undo."""
+        return bool(self._decisions)
+
+    @property
     def progress(self) -> tuple[int, int]:
         """(resolved titles, total)."""
         return self._cursor.position, len(self._titles)
@@ -301,21 +305,16 @@ class ImportSession:
     def _record(self, decision: Decision) -> Step:
         """Persist a decision, then apply it to a copy and publish it.
 
-        Nothing is applied if it cannot be saved; if applying fails, the decision is taken back
-        and the published cursor stays as it was.
+        Nothing is applied if it cannot be saved. Once saved, the decision is a fact and stays
+        in the log even if applying it fails: the exception propagates and the published cursor
+        is untouched (copy-on-write). A session rebuilt from the repository applies it.
         """
         cursor = self._cursor
         position = cursor.position
         self._repository.add_decision(self._id, position, decision)
         self._decisions.append((position, decision))
         work = cursor.clone()
-        try:
-            step = self._apply_decision(work, decision)
-        except BaseException:
-            self._decisions.pop()
-            with suppress(PersistenceError):
-                self._repository.remove_last_decision(self._id)
-            raise
+        step = self._apply_decision(work, decision)
         self._cursor = work
         return step
 
