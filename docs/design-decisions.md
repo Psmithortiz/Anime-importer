@@ -67,6 +67,19 @@ lock-free readers behind the polling endpoint never see a half-applied step. The
 once per app and shared by all sessions, so MAL's rate limit and the JSON caches are not duplicated
 when several sessions are open.
 
+### Deleting a session another thread may be using
+
+A session can be deleted from the recent list, but it may still be in use: its background
+worker may be writing results, or another tab may be about to answer a question. Deleting is
+refused with `409` while the session is preparing or its worker is still resolving titles. The
+check acquires the session lock without blocking, because preparing holds that lock for minutes
+and the request should fail at once instead of hanging. The registry never drops loaded sessions,
+so "refuse if it is in memory" would have made every session opened since startup undeletable.
+A request may already hold a reference to the session when it is deleted, so the session is also
+marked as deleted: that request gets `404`, and the UI takes the other tab back to the start
+screen. Locks are always taken in the same order (the session's before the registry's), so the
+two can never deadlock.
+
 ### Franchise discovery as a breadth-first search
 
 MAL only exposes `related_anime` on each anime's
@@ -135,6 +148,8 @@ virtual environment and runs as a non-root user. `.dockerignore` is an allowlist
 caches and secrets can never end up in the image; keys are entered at run time. The server binds to `0.0.0.0`
 only inside the container (through the `HOST` setting, so there is still a single entry point),
 and compose publishes it on `127.0.0.1` only, because the app has no authentication.
+Each release also publishes the image to GitHub Container Registry (amd64 only, the platform I can
+test) after a smoke test, so it runs with a single `docker run` and no clone.
 
 ### A desktop launcher without races
 

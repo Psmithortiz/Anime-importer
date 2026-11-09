@@ -232,7 +232,7 @@ Paste both keys in the Settings screen and click **Save**. The app starts right 
 ### Start
 
 On the start screen, paste your list into the text box, one title per line, or click
-**Choose File** and pick a `.txt` file. The counter below the box shows how many titles it found.
+**Load .txt file** and pick a `.txt` file. The counter below the box shows how many titles it found.
 Typos, a mix of English, Spanish and romaji, and your own notes such as `S2 ***` or `MANGA?` are
 fine: that is what the app is for. Click **Start import**.
 
@@ -307,6 +307,9 @@ imported, how many per list status, and the rejected lines with the reason.
 - **If MyAnimeList fails** (it is down, or the connection drops), the screen says **The import
   failed**. Click **Retry** to continue from your last saved answer.
 - **New import** goes back to the start screen. The current session stays in Recent sessions.
+- **Delete** a session from Recent sessions with the button next to it. A session that is still
+  looking up titles on MyAnimeList cannot be deleted until that finishes; wait a moment and try
+  again. Deleting cannot be undone.
 
 ## 4. Command line
 
