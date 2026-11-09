@@ -1,4 +1,4 @@
-# Allowlist: everything is excluded unless listed, so secrets (.env) and caches never reach the image.
+# Allowlist: everything is excluded unless listed, so secrets and caches never reach the image.
 *
 !pyproject.toml
 !uv.lock

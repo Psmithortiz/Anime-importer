@@ -6,15 +6,14 @@ services:
       # Published on 127.0.0.1 only: the app has no authentication.
       - "127.0.0.1:8000:8000"
     environment:
-      # Demo mode by default. For the real mode use DEMO=0 and a .env file in the project root.
+      # Demo mode by default. For the real mode run `DEMO=0 docker compose up` and enter your
+      # API keys in the Settings screen (they are saved in the data volume).
       DEMO: ${DEMO:-1}
-    env_file:
-      - path: .env
-        required: false
     volumes:
       # Keeps the normalization and details caches between restarts.
       - cache:/home/app/.cache
-      # User data (sessions), unlike the cache volume it should not be deleted to free space.
+      # User data (sessions and the config file with your API keys). Unlike the cache volume,
+      # do not delete it to free space.
       - data:/home/app/data
 
 volumes:
