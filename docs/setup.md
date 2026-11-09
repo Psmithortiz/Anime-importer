@@ -286,7 +286,7 @@ uv run anime-importer --input anime_list.txt --output output.xml
 | --- | --- | --- |
 | `--input` | `anime_list.txt` | Your list, one title per line |
 | `--output` | `output.xml` | The MyAnimeList XML to import (same steps as in [Download and import](#download-and-import-into-myanimelist)) |
-| `--rejected` | `errores.txt` | A report of the discarded and not found lines |
+| `--rejected` | `rejected.txt` | A report of the discarded and not found lines |
 
 Each question prints numbered options: type a number and press Enter, or type `X` to discard the
 line. There is no Settings screen: the keys must already be saved (from the web app) or set as

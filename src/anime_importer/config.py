@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     mal_client_id: str | None = None
     input_path: Path = Path("anime_list.txt")
     output_xml_path: Path = Path("output.xml")
-    rejected_report_path: Path = Path("errores.txt")
+    rejected_report_path: Path = Path("rejected.txt")
     normalization_cache_dir: Path = Field(default_factory=lambda: _cache_dir() / "normalization")
     details_cache_path: Path = Field(default_factory=lambda: _cache_dir() / "mal_details.json")
     details_cache_ttl_days: float = 7
