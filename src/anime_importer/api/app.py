@@ -1,7 +1,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Response
@@ -54,6 +54,19 @@ class PollingAccessFilter(logging.Filter):
             and _POLLING_PATH.match(path) is not None
             and status == 200
         )
+
+
+class RevalidatingStaticFiles(StaticFiles):
+    """StaticFiles that makes the browser revalidate on every load.
+
+    Without Cache-Control browsers apply heuristic caching and keep running an old app.js after
+    an update. `no-cache` still allows a 304 answer thanks to the ETag/Last-Modified headers.
+    """
+
+    def file_response(self, *args: Any, **kwargs: Any) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def get_registry(request: Request) -> SessionRegistry:
@@ -272,7 +285,7 @@ def create_app(
         )
 
     # Mounted last so it does not shadow the /api routes.
-    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+    app.mount("/", RevalidatingStaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app
 
 
