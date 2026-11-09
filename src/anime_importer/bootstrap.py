@@ -95,6 +95,9 @@ class SessionServices:
     def list_recent(self, limit: int) -> list[SessionSummary]:
         return self.repository.list_recent(limit)
 
+    def delete_session(self, session_id: str) -> bool:
+        return self.repository.delete(session_id)
+
     def restore_session(self, session_id: str) -> ImportSession | None:
         """Rebuild a stored session, or None if it does not exist."""
         stored = self.repository.load(session_id)
@@ -155,6 +158,9 @@ class UnconfiguredServices:
 
     def list_recent(self, limit: int) -> list[SessionSummary]:
         return self._repository.list_recent(limit)
+
+    def delete_session(self, session_id: str) -> bool:
+        return self._repository.delete(session_id)
 
 
 def build_provider(

@@ -260,6 +260,60 @@ def test_sqlite_newer_schema_version_raises(tmp_path: Path) -> None:
         SqliteSessionRepository(path)
 
 
+def test_delete_removes_the_session(repo) -> None:
+    repo.create("s1", ["a"])
+    repo.create("s2", ["b"])
+
+    assert repo.delete("s1") is True
+
+    assert repo.load("s1") is None
+    assert [item.id for item in repo.list_recent(10)] == ["s2"]
+
+
+def test_delete_leaves_other_sessions_intact(repo) -> None:
+    repo.create("s1", ["a"])
+    repo.create("s2", ["b"])
+    repo.add_resolution("s2", 0, _imported())
+    repo.add_decision("s2", 0, Discard())
+
+    repo.delete("s1")
+
+    stored = repo.load("s2")
+    assert stored is not None
+    assert stored.titles == ("b",)
+    assert len(stored.resolutions) == 1
+    assert len(stored.decisions) == 1
+
+
+def test_delete_unknown_or_twice_returns_false(repo) -> None:
+    assert repo.delete("nope") is False
+    repo.create("s1", ["a"])
+
+    assert repo.delete("s1") is True
+    assert repo.delete("s1") is False
+
+
+def test_sqlite_delete_removes_child_rows(tmp_path: Path) -> None:
+    path = tmp_path / "sessions.db"
+    repo = SqliteSessionRepository(path)
+    repo.create("s1", ["a"])
+    repo.add_resolution("s1", 0, _imported())
+    repo.save_answer("s1", 0, "q", _imported())
+    repo.add_decision("s1", 0, Discard())
+
+    repo.delete("s1")
+
+    conn = sqlite3.connect(path)
+    try:
+        counts = [
+            conn.execute(f"SELECT COUNT(*) FROM {table} WHERE session_id='s1'").fetchone()[0]
+            for table in ("resolutions", "answers", "decisions")
+        ]
+    finally:
+        conn.close()
+    assert counts == [0, 0, 0]
+
+
 def test_sqlite_delete_cascades(tmp_path: Path) -> None:
     path = tmp_path / "sessions.db"
     repo = SqliteSessionRepository(path)

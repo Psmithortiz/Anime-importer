@@ -124,6 +124,10 @@ def create_app(
             status_code=503, content={"detail": "Could not save the session; try again"}
         )
 
+    @app.exception_handler(SessionNotFoundError)
+    def session_not_found(request: Request, exc: SessionNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": "Session not found"})
+
     @app.exception_handler(NotConfiguredError)
     def not_configured(request: Request, exc: NotConfiguredError) -> JSONResponse:
         return JSONResponse(status_code=409, content={"detail": "Configure your API keys first"})
@@ -196,6 +200,19 @@ def create_app(
     )
     def get_session(managed: ManagedDep) -> SessionView:
         return managed.view()
+
+    @app.delete(
+        "/api/sessions/{session_id}",
+        status_code=204,
+        tags=["sessions"],
+        summary="Delete a session",
+    )
+    def delete_session(session_id: str, registry: RegistryDep) -> Response:
+        try:
+            registry.delete(session_id)
+        except InvalidStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        return Response(status_code=204)
 
     @app.post(
         "/api/sessions/{session_id}/choose",

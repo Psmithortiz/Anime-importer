@@ -17,6 +17,9 @@ RUN uv sync --locked --no-dev --no-editable
 
 # ---- runtime: only the virtual environment, as a non-root user
 FROM python:3.13-slim
+LABEL org.opencontainers.image.source="https://github.com/Psmithortiz/Anime-importer" \
+      org.opencontainers.image.description="Turn a hand-written anime list into a MyAnimeList import file" \
+      org.opencontainers.image.licenses="MIT"
 RUN useradd --create-home app \
     && mkdir -p /home/app/.cache /home/app/data \
     && chown app:app /home/app/.cache /home/app/data

@@ -61,6 +61,7 @@ class SessionRepository(Protocol):
       returns None).
     - Every write updates the session's `updated_at`, taken from an injectable clock.
     - `list_recent` orders by `updated_at`, most recent first.
+    - `delete` of a nonexistent session returns False (it does not raise).
     """
 
     def create(self, session_id: str, titles: Sequence[str]) -> None: ...
@@ -84,3 +85,7 @@ class SessionRepository(Protocol):
     def load(self, session_id: str) -> StoredSession | None: ...
 
     def list_recent(self, limit: int) -> list[SessionSummary]: ...
+
+    def delete(self, session_id: str) -> bool:
+        """Delete the session and everything stored for it; False if it did not exist."""
+        ...

@@ -192,6 +192,14 @@ class SqliteSessionRepository:
         except sqlite3.Error as exc:
             raise PersistenceError(f"Cannot remove the decision: {exc}") from exc
 
+    def delete(self, session_id: str) -> bool:
+        try:
+            with closing(self._connect()) as conn, conn:
+                cursor = conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+                return cursor.rowcount > 0
+        except sqlite3.Error as exc:
+            raise PersistenceError(f"Cannot delete the session: {exc}") from exc
+
     def load(self, session_id: str) -> StoredSession | None:
         try:
             with closing(self._connect()) as conn, conn:

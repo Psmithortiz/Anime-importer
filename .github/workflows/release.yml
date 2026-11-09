@@ -80,3 +80,41 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create $env:GITHUB_REF_NAME $env:ZIP "$env:ZIP.sha256" --draft --title "Anime Importer $env:GITHUB_REF_NAME" --generate-notes
+  docker:
+    name: docker
+    # The windows job checks that the tag matches project.version and runs lint and tests:
+    # nothing is published if it fails.
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t anime-importer .
+      - name: Smoke test in demo mode
+        run: |
+          docker run -d --name app -p 8000:8000 -e DEMO=1 anime-importer
+          for _ in $(seq 1 30); do
+            # /api/sessions proves the database could be created by the non-root user.
+            if curl -fsS http://127.0.0.1:8000/api/info \
+              && curl -fsS http://127.0.0.1:8000/api/sessions; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs app
+          exit 1
+      - name: Push to GitHub Container Registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Image names must be lowercase; the owner is "Psmithortiz".
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          version="${GITHUB_REF_NAME#v}"
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag anime-importer "$image:$version"
+          docker tag anime-importer "$image:latest"
+          docker push "$image:$version"
+          docker push "$image:latest"

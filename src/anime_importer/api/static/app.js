@@ -55,6 +55,7 @@ async function api(method, path, body) {
     error.status = response.status;
     throw error;
   }
+  if (response.status === 204) return null;
   return response.json();
 }
 
@@ -117,8 +118,12 @@ function schedulePoll() {
       if (polledId !== sessionId) return; // the user has already switched session
       $("poll-warning").hidden = true;
       render(view);
-    } catch {
+    } catch (error) {
       if (polledId !== sessionId) return;
+      if (error.status === 404) {
+        sessionGone();
+        return;
+      }
       $("poll-warning").hidden = false;
       schedulePoll();
     }
@@ -485,6 +490,10 @@ async function submit(action) {
     const view = await action();
     render(view);
   } catch (error) {
+    if (error.status === 404) {
+      sessionGone();
+      return;
+    }
     const box = $("question-error");
     box.textContent = error.message;
     box.hidden = false;
@@ -535,6 +544,10 @@ async function undo() {
   try {
     render(await api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/undo`));
   } catch (error) {
+    if (error.status === 404) {
+      sessionGone();
+      return;
+    }
     // 409 / 503: the screen does not change, the message is shown on it.
     errorBox.textContent = error.message;
     errorBox.hidden = false;
@@ -549,10 +562,26 @@ async function retry() {
   try {
     render(await api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/retry`));
   } catch (error) {
+    if (error.status === 404) {
+      sessionGone();
+      return;
+    }
     $("failed-error").textContent = error.message;
     $("failed-error").hidden = false;
     setBusy(false);
   }
+}
+
+// The session was deleted (for example from another tab): go back to the start screen.
+function sessionGone() {
+  setBusy(false);
+  goToStart();
+  showStartError("This session no longer exists.");
+}
+
+function showStartError(message) {
+  $("start-error").textContent = message;
+  $("start-error").hidden = false;
 }
 
 // Open an existing session (from the URL hash or from the recent list).
@@ -583,20 +612,34 @@ function recentSummary(item) {
 function buildRecentItem(item) {
   const answers = `${item.decision_count} ${item.decision_count === 1 ? "answer" : "answers"}`;
   const when = new Date(item.updated_at).toLocaleString();
-  const row = el("li", { className: "recent-item" }, [
+  const open = el("button", { className: "recent-open", attrs: { type: "button" } }, [
     el("span", { text: recentSummary(item), className: "recent-titles" }),
     el("span", { text: `${answers} · ${when}`, className: "muted small" }),
   ]);
-  row.setAttribute("role", "button");
-  row.setAttribute("tabindex", "0");
-  row.addEventListener("click", () => openSession(item.id));
-  row.addEventListener("keydown", (event) => {
-    if (event.target === row && event.key === "Enter") {
-      event.preventDefault();
-      openSession(item.id);
-    }
+  open.addEventListener("click", () => openSession(item.id));
+  const remove = el("button", {
+    className: "recent-delete",
+    text: "Delete",
+    attrs: { type: "button", "aria-label": "Delete session" },
   });
-  return row;
+  remove.addEventListener("click", () => deleteSession(item.id));
+  return el("li", { className: "recent-item" }, [open, remove]);
+}
+
+async function deleteSession(id) {
+  if (busy) return;
+  if (!confirm("Delete this session? This cannot be undone.")) return;
+  busy = true;
+  $("start-error").hidden = true;
+  try {
+    await api("DELETE", `/api/sessions/${encodeURIComponent(id)}`);
+    await loadRecent();
+  } catch (error) {
+    showStartError(error.message);
+    if (error.status === 404) await loadRecent();
+  } finally {
+    busy = false;
+  }
 }
 
 async function loadRecent() {
@@ -853,7 +896,10 @@ async function loadInfo() {
 }
 
 async function init() {
-  $("titles-input").addEventListener("input", updateLineCount);
+  $("titles-input").addEventListener("input", () => {
+    $("file-name").textContent = "";
+    updateLineCount();
+  });
   $("file-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
     $("file-name").textContent = file ? file.name : "";
