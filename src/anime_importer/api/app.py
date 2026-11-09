@@ -32,6 +32,7 @@ from anime_importer.ports import PersistenceError
 
 if TYPE_CHECKING:
     from anime_importer.bootstrap import FileConfigurator
+    from anime_importer.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -289,10 +290,7 @@ def create_app(
     return app
 
 
-def run() -> None:
-    from anime_importer.config import Settings
-
-    settings = Settings()
+def build_server(settings: "Settings") -> uvicorn.Server:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     config = uvicorn.Config(
         "anime_importer.api.app:create_app",
@@ -302,4 +300,10 @@ def run() -> None:
     )
     # Config configures uvicorn's logging in its constructor, so the filter goes after it.
     logging.getLogger("uvicorn.access").addFilter(PollingAccessFilter())
-    uvicorn.Server(config).run()
+    return uvicorn.Server(config)
+
+
+def run() -> None:
+    from anime_importer.config import Settings
+
+    build_server(Settings()).run()

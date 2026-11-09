@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 anime-importer = "anime_importer.cli:main"
 anime-importer-web = "anime_importer.api.app:run"
+anime-importer-app = "anime_importer.launcher:run_frozen_safe"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
@@ -33,6 +34,9 @@ target-version = "py313"
 testpaths = ["tests"]
 
 [dependency-groups]
+build = [
+    "pyinstaller>=6.22.3",
+]
 dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.3",

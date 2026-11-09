@@ -349,6 +349,7 @@ def test_info_without_demo_text():
     client = TestClient(create_app(lambda titles: None))
 
     assert client.get("/api/info").json() == {
+        "app": "anime-importer",
         "demo": False,
         "configured": True,
         "sample_text": None,
@@ -364,6 +365,7 @@ def test_info_with_demo_text():
     )
 
     assert client.get("/api/info").json() == {
+        "app": "anime-importer",
         "demo": True,
         "configured": True,
         "sample_text": SAMPLE,
@@ -415,3 +417,9 @@ def test_view_derives_finished_status_from_the_snapshot():
     assert view.status == "finished"
     assert view.summary is not None
     assert view.question is None
+
+
+def test_info_carries_the_app_marker_used_by_the_launcher():
+    client = _client()
+
+    assert client.get("/api/info").json()["app"] == "anime-importer"

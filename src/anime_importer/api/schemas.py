@@ -17,6 +17,8 @@ SessionStatus = Literal["preparing", "question", "finished", "failed"]
 
 
 class AppInfo(BaseModel):
+    # Marker so the desktop launcher can tell one of our instances from any other server.
+    app: Literal["anime-importer"] = "anime-importer"
     demo: bool
     configured: bool = True
     sample_text: str | None = None

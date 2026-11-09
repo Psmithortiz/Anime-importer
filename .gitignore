@@ -8,3 +8,5 @@ output.xml
 .idea/
 .cache/
 .venv/
+/build/
+/dist/
