@@ -1,4 +1,5 @@
 # PyInstaller spec (onedir). Build: uv run --group build pyinstaller packaging/anime-importer.spec
+import shutil
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
@@ -29,3 +30,5 @@ coll = COLLECT(  # noqa: F821
     name="AnimeImporter",
     upx=False,
 )
+# The demo launcher goes next to the .exe (not into _internal/), in local builds and in releases.
+shutil.copy2(root / "packaging" / "AnimeImporter Demo.bat", Path(DISTPATH) / "AnimeImporter")  # noqa: F821

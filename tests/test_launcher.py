@@ -4,7 +4,7 @@ import pytest
 
 from anime_importer import launcher
 from anime_importer.config import Settings
-from anime_importer.launcher import bind_socket, is_our_app
+from anime_importer.launcher import bind_socket, running_mode
 
 
 @pytest.fixture
@@ -21,8 +21,8 @@ def _occupy(sockets):
     return sock, sock.getsockname()[1]
 
 
-def _settings(port):
-    return Settings(demo=True, port=port)
+def _settings(port, demo=True):
+    return Settings(demo=demo, port=port)
 
 
 class _Run:
@@ -62,20 +62,45 @@ def test_free_port_serves_on_it_and_opens_the_browser():
     assert run.urls == [f"http://127.0.0.1:{port}/"]
 
 
-def test_busy_port_with_our_app_only_opens_the_browser(sockets):
+@pytest.mark.parametrize("demo", [True, False])
+def test_busy_port_with_our_app_in_the_same_mode_only_opens_the_browser(sockets, demo):
     _, port = _occupy(sockets)
     run = _Run()
 
     code = launcher.main(
-        settings=_settings(port),
+        settings=_settings(port, demo=demo),
         open_browser=run.open_browser,
-        get_json=lambda url: {"app": "anime-importer"},
+        get_json=lambda url: {"app": "anime-importer", "demo": demo},
         serve=run.serve,
     )
 
     assert code == 0
     assert run.urls == [f"http://127.0.0.1:{port}/"]
     assert run.served == []
+
+
+@pytest.mark.parametrize("demo", [True, False])
+def test_busy_port_with_our_app_in_the_other_mode_uses_a_free_port(sockets, capsys, demo):
+    _, busy = _occupy(sockets)
+    run = _Run()
+
+    code = launcher.main(
+        settings=_settings(busy, demo=demo),
+        open_browser=run.open_browser,
+        get_json=lambda url: {"app": "anime-importer", "demo": not demo},
+        serve=run.serve,
+    )
+
+    assert code == 0
+    assert run.ports[0] != busy
+    assert run.served[0].port == run.ports[0]
+    assert run.served[0].demo is demo
+    assert run.urls == [f"http://127.0.0.1:{run.ports[0]}/"]
+    running, starting = ("normal", "demo") if demo else ("demo", "normal")
+    assert (
+        f"Anime Importer is already running in {running} mode at http://127.0.0.1:{busy}/; "
+        f"starting {starting} mode on a free port."
+    ) in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("answer", [OSError("refused"), {"app": "other"}, ["x"]])
@@ -108,27 +133,34 @@ def test_bind_socket_fails_on_a_used_port_and_leaves_nothing_open(sockets):
         bind_socket("127.0.0.1", port)
 
 
-def test_is_our_app_checks_the_marker():
-    assert is_our_app("http://x/", lambda url: {"app": "anime-importer"}) is True
-    assert is_our_app("http://x/", lambda url: {"demo": False}) is False
-    assert is_our_app("http://x/", lambda url: [1]) is False
+def test_running_mode_checks_the_marker():
+    assert running_mode("http://x/", lambda url: {"app": "anime-importer", "demo": True}) is True
+    assert running_mode("http://x/", lambda url: {"app": "anime-importer", "demo": False}) is False
+    assert running_mode("http://x/", lambda url: {"demo": False}) is None
+    assert running_mode("http://x/", lambda url: {"app": "other", "demo": True}) is None
+    assert running_mode("http://x/", lambda url: [1]) is None
 
 
-def test_is_our_app_returns_false_on_any_error():
+@pytest.mark.parametrize("demo", [{}, {"demo": None}, {"demo": "yes"}, {"demo": 1}])
+def test_running_mode_is_none_when_demo_is_missing_or_not_a_bool(demo):
+    assert running_mode("http://x/", lambda url: {"app": "anime-importer", **demo}) is None
+
+
+def test_running_mode_is_none_on_any_error():
     def boom(url):
         raise TimeoutError
 
-    assert is_our_app("http://x/", boom) is False
+    assert running_mode("http://x/", boom) is None
 
 
-def test_is_our_app_asks_the_info_endpoint():
+def test_running_mode_asks_the_info_endpoint():
     asked = []
 
     def get_json(url):
         asked.append(url)
         return {}
 
-    is_our_app("http://127.0.0.1:8000/", get_json)
+    running_mode("http://127.0.0.1:8000/", get_json)
 
     assert asked == ["http://127.0.0.1:8000/api/info"]
 
