@@ -20,6 +20,7 @@ exe = EXE(  # noqa: F821
     name="AnimeImporter",
     console=True,
     upx=False,
+    icon=str(root / "packaging" / "app.ico"),
 )
 coll = COLLECT(  # noqa: F821
     exe,

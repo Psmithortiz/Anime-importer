@@ -80,7 +80,7 @@ def test_settings_defaults(monkeypatch, tmp_path):
     assert settings.gemini_model == "gemini-2.5-flash"
     assert settings.input_path == Path("anime_list.txt")
     assert settings.output_xml_path == Path("output.xml")
-    assert settings.rejected_report_path == Path("errores.txt")
+    assert settings.rejected_report_path == Path("rejected.txt")
 
 
 def test_main_empty_input_returns_1_without_writing_files(monkeypatch, tmp_path):

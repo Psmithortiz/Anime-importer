@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 anime_list.txt
 errores.txt
+rejected.txt
 output.xml
 .idea/
 .cache/
