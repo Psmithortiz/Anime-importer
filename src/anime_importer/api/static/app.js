@@ -812,32 +812,34 @@ async function saveSettings() {
 async function refreshSettingsLink(info) {
   $("settings-link").hidden = true;
   if (info.demo) return;
+  let config;
   try {
-    const config = await api("GET", "/api/config");
-    const editable = config.keys.some((key) => key.source !== "environment" && key.source !== "dotenv");
-    $("settings-link").hidden = !editable;
+    config = await api("GET", "/api/config");
   } catch {
-    // Without the endpoint there is nothing to configure.
+    return; // Without the endpoint there is nothing to configure.
   }
+  const editable = config.keys.some((key) => key.source !== "environment" && key.source !== "dotenv");
+  $("settings-link").hidden = !editable;
 }
 
 async function loadInfo() {
+  let info;
   try {
-    const info = await api("GET", "/api/info");
-    configured = info.configured !== false;
-    await refreshSettingsLink(info);
-    if (!info.demo) return info;
-    $("demo-banner").textContent = DEMO_NOTICE;
-    $("demo-banner").hidden = false;
-    if (info.sample_text && $("titles-input").value.trim() === "") {
-      $("titles-input").value = info.sample_text;
-      updateLineCount();
-    }
-    return info;
+    info = await api("GET", "/api/info");
   } catch {
     // The info endpoint is optional: without it the app behaves as in normal mode.
     return null;
   }
+  configured = info.configured !== false;
+  await refreshSettingsLink(info);
+  if (!info.demo) return info;
+  $("demo-banner").textContent = DEMO_NOTICE;
+  $("demo-banner").hidden = false;
+  if (info.sample_text && $("titles-input").value.trim() === "") {
+    $("titles-input").value = info.sample_text;
+    updateLineCount();
+  }
+  return info;
 }
 
 async function init() {
