@@ -23,7 +23,7 @@ portfolio project.
 
 Run end to end on my real list of 317 hand-written lines:
 
-| | Version 1 (May 2026) | Version 2 |
+| | First script (May 2026) | This rewrite |
 |---|---|---|
 | Lines resolved | 305 / 309 (98.7%) | 314 / 317 (99.1%) |
 | MAL entries exported | 305 | 434 (franchise discovery added ~120 seasons, movies and OVAs) |

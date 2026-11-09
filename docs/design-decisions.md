@@ -6,25 +6,37 @@ Back to the [README](../README.md).
 
 ```
 src/anime_importer/
-├── domain/        Pure models and rules. No I/O, no frameworks.
-│   ├── models.py, matching.py   Dataclasses, enums and fuzzy matching.
-│   └── session.py               Steps, resolutions, user decisions and stored snapshots.
-├── ports.py       Protocols the core depends on (AnimeSearcher, TitleNormalizer,
-│                  SessionRepository) and their errors.
-├── adapters/      The outside world: Gemini, MAL, caches, XML and text files, demo replay.
-│   ├── sqlite_repository.py     Sessions in SQLite (one connection per operation, WAL).
-│   ├── memory_repository.py     The same contract in memory (CLI and tests).
-│   └── session_codec.py         JSON serialization of resolutions and decisions.
-├── services/      ImportSession: the state machine that drives an import and pauses for questions.
-├── api/           FastAPI app, Pydantic schemas, session registry and the static frontend.
-├── cli.py         Interactive terminal interface over the same service.
-└── bootstrap.py   Composition root: the only place that wires concrete adapters together.
+├── domain/                 Pure models and rules. No I/O, no frameworks.
+│   ├── models.py           Dataclasses and enums (candidates, list status, relations).
+│   ├── matching.py         Fuzzy matching on main and alternative titles.
+│   └── session.py          Steps, resolutions, user decisions and stored snapshots.
+├── ports.py                Protocols the core depends on (AnimeSearcher, AnimeDetailsProvider,
+│                           TitleNormalizer, SessionRepository) and their errors.
+├── services/
+│   ├── import_session.py   ImportSession: the event log, the look-ahead worker and undo.
+│   └── franchise.py        Franchise discovery: breadth-first search over MAL relations.
+├── adapters/               The outside world.
+│   ├── gemini.py, mal.py   Gemini normalizer, MAL search and details (shared retry and throttle
+│   │                       in http.py).
+│   ├── normalization_cache.py, details_cache.py
+│   │                       Per-title normalization cache and 7-day MAL details cache.
+│   ├── sqlite_repository.py, memory_repository.py, session_codec.py
+│   │                       Sessions in SQLite (WAL), the same contract in memory, serialization.
+│   ├── demo.py             Recording and replaying adapters for demo mode.
+│   └── mal_xml.py, text_files.py, config_file.py, json_files.py
+│                           XML export, list files, the user config file and atomic writes.
+├── api/                    FastAPI app, Pydantic schemas, session registry, static frontend.
+├── cli.py                  Interactive terminal interface over the same service.
+├── launcher.py             Desktop launcher used by the Windows executable.
+├── config.py               Settings: environment > user config file > defaults.
+└── bootstrap.py            Composition root: the only place that wires concrete adapters.
 ```
 
 Dependencies point inward: `api / cli → services → domain ← adapters`. The domain never imports an
 HTTP client, an SDK or a web framework, so it is tested without network access or API keys.
 Outside the package, `scripts/record_demo.py` records the demo data with the real adapters (it
-needs API keys).
+needs API keys), and `packaging/` holds the PyInstaller spec, the icon and the demo launcher for the
+Windows build.
 
 ## Decisions
 
@@ -110,15 +122,6 @@ title, keyed by the lightly normalized input line and versioned by a hash of the
 A callback persists each chunk as soon as it validates, with atomic writes, so a quota error in chunk 11
 keeps chunks 1–10. Inserting a title, reordering the list or changing the chunk size invalidates nothing.
 
-### Matching bugs found with real data
-
-Two examples:
-- The query sanitizer deleted punctuation, turning `Geiko-hen` into `Geikohen`. MAL's search requires
-  every word to match, so modern season titles returned nothing. Symbols now become spaces.
-- Fuzzy matching originally mapped results back by title text, so two entries with the same title
-  collapsed into one. Matching now keeps candidate identity, and a tie above the threshold is never
-  auto-accepted.
-
 ### Reading the import contract carefully
 
 I first assumed `update_on_import=0` meant "add only what's
@@ -162,9 +165,28 @@ process take a port that is already in use. The launcher also compares the mode 
 is already running: if it is the other mode, it starts its own on a free port instead of opening that
 one, which is safe because each mode uses its own database.
 
+### A desktop app, not a hosted service
+
+Every import needs a Gemini key and a MAL client ID. Hosting the app would mean either running
+everyone's imports on my keys (the Gemini free tier allows 20 requests a day, and a 300-title list
+uses 16; MAL's rate limit is per client ID, so all users would share one request per second) or
+asking users to hand their keys to my server, which then has to store and protect them. Both also
+need accounts, abuse limits and a multi-user database. A local app avoids all of it: each person
+uses their own keys and quota, and nothing leaves their machine except the calls to Gemini and MAL.
+The architecture would allow a hosted version (PostgreSQL would be another `SessionRepository`), but
+the hard parts are cost, quotas and credential handling, not code.
+
 ## Matching on real data
 
-The 3 remaining lines each exposed a different issue: a query cut mid-word by the 64-character limit, a
-normalization that was worse than the original line (the LLM "corrected" `Mob wo` to `Mobu o`, and
-expanded an anime title to its manga's full name), and an abbreviation the LLM didn't recognize. Cutting
-at word boundaries and falling back to the original line now resolve all three.
+Running the tool on my real list of 317 lines exposed bugs that no test had anticipated:
+
+- The query sanitizer deleted punctuation, turning `Geiko-hen` into `Geikohen`. MAL's search requires
+  every word to match, so modern season titles returned nothing. Symbols now become spaces.
+- Fuzzy matching originally mapped results back by title text, so two entries with the same title
+  collapsed into one. Matching now keeps candidate identity, and a tie above the threshold is never
+  auto-accepted.
+- The 3 lines still rejected in the full run each exposed a different issue: a query cut mid-word by
+  the 64-character limit, a normalization that was worse than the original line (the LLM "corrected"
+  `Mob wo` to `Mobu o`, and expanded an anime title to its manga's full name), and an abbreviation the
+  LLM didn't recognize. Cutting at word boundaries and falling back to the original line now resolve
+  all three.
