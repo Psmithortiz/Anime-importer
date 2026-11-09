@@ -247,7 +247,7 @@ Caches, sessions and settings live in per-user folders, never in the current fol
 | Normalization cache | `%LOCALAPPDATA%\anime-importer\Cache\normalization` / `~/.cache/anime-importer/normalization` / `~/Library/Caches/anime-importer/normalization` | `NORMALIZATION_CACHE_DIR` |
 | MAL details cache | `mal_details.json` in the same cache folder | `DETAILS_CACHE_PATH` |
 | Sessions | see below | `DATABASE_PATH` (`DEMO_DATABASE_PATH` in demo mode) |
-| Config file | `%APPDATA%\anime-importer\config.json` / `~/.config/anime-importer/config.json` / `~/Library/Application Support/anime-importer/config.json` | `ANIME_IMPORTER_CONFIG_FILE` |
+| Config file | `%LOCALAPPDATA%\anime-importer\config.json` / `~/.config/anime-importer/config.json` / `~/Library/Application Support/anime-importer/config.json` | `ANIME_IMPORTER_CONFIG_FILE` |
 
 Settings are read in this order of priority (highest first): environment variables, `.env`, the
 config file (a JSON object such as `{"gemini_api_key": "...", "mal_client_id": "..."}`), and the
