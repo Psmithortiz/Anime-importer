@@ -35,6 +35,7 @@ def test_database_path_comes_from_the_environment(monkeypatch, tmp_path):
 
 def test_create_app_without_registry_uses_the_demo_database(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO", "1")
+    monkeypatch.setenv("ALLOWED_HOSTS", '["testserver"]')
     monkeypatch.setenv("DEMO_DELAY_SECONDS", "0")
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "real.db"))
     monkeypatch.setenv("DEMO_DATABASE_PATH", str(tmp_path / "sub" / "demo.db"))

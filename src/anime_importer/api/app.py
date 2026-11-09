@@ -1,18 +1,20 @@
 import logging
 import re
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from anime_importer.adapters.mal_xml import render_mal_xml
 from anime_importer.adapters.text_files import parse_titles
 from anime_importer.api.registry import (
     InvalidStateError,
     ManagedSession,
+    NotConfiguredError,
     SessionNotFoundError,
     SessionRegistry,
 )
@@ -20,11 +22,16 @@ from anime_importer.api.schemas import (
     AppInfo,
     ChooseManyRequest,
     ChooseRequest,
+    ConfigUpdate,
+    ConfigView,
     CreateSessionRequest,
     SessionSummaryOut,
     SessionView,
 )
 from anime_importer.ports import PersistenceError
+
+if TYPE_CHECKING:
+    from anime_importer.bootstrap import FileConfigurator
 
 logger = logging.getLogger(__name__)
 
@@ -66,23 +73,34 @@ def get_managed(session_id: str, registry: RegistryDep) -> ManagedSession:
 ManagedDep = Annotated[ManagedSession, Depends(get_managed)]
 
 
-def create_app(registry: SessionRegistry | None = None, demo_text: str | None = None) -> FastAPI:
+def create_app(
+    registry: SessionRegistry | None = None,
+    demo_text: str | None = None,
+    configurator: "FileConfigurator | None" = None,
+    allowed_hosts: list[str] | None = None,
+) -> FastAPI:
     if registry is None:
         from anime_importer.adapters.sqlite_repository import SqliteSessionRepository
-        from anime_importer.bootstrap import build_services
-        from anime_importer.config import Settings
+        from anime_importer.bootstrap import FileConfigurator, build_provider
+        from anime_importer.config import Settings, config_file_path
 
         settings = Settings()
         if settings.demo:
             demo_text = (settings.demo_data_dir / "list.txt").read_text(encoding="utf-8")
         database = settings.demo_database_path if settings.demo else settings.database_path
+        repository = SqliteSessionRepository(database)
         # Everything is built ONCE per app: adapters (throttle, caches) are shared by all sessions.
-        registry = SessionRegistry(build_services(settings, SqliteSessionRepository(database)))
+        registry = SessionRegistry(build_provider(settings, repository))
+        configurator = FileConfigurator(registry, repository, config_file_path())
+        allowed_hosts = settings.allowed_hosts
 
     app = FastAPI(
         title="Anime Importer",
         description="Normalize a messy anime list with Gemini and import it into MyAnimeList.",
     )
+    if allowed_hosts is not None:
+        # Rejects requests whose Host header is not ours (DNS rebinding protection).
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
     app.state.registry = registry
 
     @app.exception_handler(PersistenceError)
@@ -92,9 +110,29 @@ def create_app(registry: SessionRegistry | None = None, demo_text: str | None = 
             status_code=503, content={"detail": "Could not save the session; try again"}
         )
 
+    @app.exception_handler(NotConfiguredError)
+    def not_configured(request: Request, exc: NotConfiguredError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": "Configure your API keys first"})
+
     @app.get("/api/info", response_model=AppInfo, tags=["meta"], summary="App mode info")
     def info() -> AppInfo:
-        return AppInfo(demo=demo_text is not None, sample_text=demo_text)
+        configured = configurator.configured if configurator is not None else True
+        return AppInfo(demo=demo_text is not None, configured=configured, sample_text=demo_text)
+
+    @app.get("/api/config", response_model=ConfigView, tags=["meta"], summary="API key status")
+    def get_config() -> ConfigView:
+        if configurator is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        return configurator.status()
+
+    @app.put("/api/config", response_model=ConfigView, tags=["meta"], summary="Save API keys")
+    def put_config(body: ConfigUpdate) -> ConfigView:
+        if configurator is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        try:
+            return configurator.save(body.model_dump(exclude_none=True))
+        except InvalidStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
 
     # All endpoints are `def` (not `async def`): they call blocking code and FastAPI
     # runs them in a threadpool; with async def they would freeze the event loop and the polling.

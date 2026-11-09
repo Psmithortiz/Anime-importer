@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     demo: bool = False
+    allowed_hosts: list[str] = ["127.0.0.1", "localhost"]
     demo_delay_seconds: float = 0.3
     demo_data_dir: Path = Path(__file__).parent / "adapters" / "demo_data"
     database_path: Path = Field(default_factory=lambda: _data_dir() / "sessions.db")
