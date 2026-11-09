@@ -127,3 +127,13 @@ def test_main_writes_xml_with_update_on_import_one(monkeypatch, tmp_path):
 
     assert code == 0
     assert "<update_on_import>1</update_on_import>" in output.read_text(encoding="utf-8")
+
+
+def test_main_without_keys_exits_with_2_naming_them(monkeypatch, tmp_path, caplog):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("MAL_CLIENT_ID", raising=False)
+
+    assert main(["--input", str(tmp_path / "x.txt")]) == 2
+    assert "GEMINI_API_KEY" in caplog.text
+    assert "MAL_CLIENT_ID" in caplog.text

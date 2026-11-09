@@ -41,6 +41,10 @@ class SessionNotFoundError(Exception):
     """No session exists with that id."""
 
 
+class NotConfiguredError(Exception):
+    """The API keys are not configured yet, so sessions cannot be created or restored."""
+
+
 class InvalidStateError(Exception):
     """The operation is not valid in the current state of the session."""
 
@@ -180,6 +184,11 @@ class SessionRegistry:
         self._run_in_background = run_in_background
         self._sessions: dict[str, ManagedSession] = {}
         self._lock = threading.Lock()
+
+    def replace_services(self, services: SessionProvider) -> None:
+        """Swap the session provider (used once, when the app gets configured while running)."""
+        with self._lock:
+            self._services = services
 
     def create(self, titles: Sequence[str]) -> ManagedSession:
         session_id = uuid.uuid4().hex

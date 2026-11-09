@@ -1,9 +1,12 @@
-from collections.abc import Sequence
+import threading
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from google import genai
 
+from anime_importer.adapters.config_file import save_config
 from anime_importer.adapters.demo import (
     DemoRecording,
     ReplayDetailsProvider,
@@ -15,7 +18,9 @@ from anime_importer.adapters.gemini import GeminiNormalizer, cache_version
 from anime_importer.adapters.http import Throttle
 from anime_importer.adapters.mal import MalDetailsProvider, MalSearcher
 from anime_importer.adapters.normalization_cache import CachingNormalizer, JsonCacheStore
-from anime_importer.config import Settings
+from anime_importer.api.registry import InvalidStateError, NotConfiguredError, SessionRegistry
+from anime_importer.api.schemas import ConfigView, KeyStatusOut
+from anime_importer.config import KeySource, Settings, key_status
 from anime_importer.domain.models import Franchise
 from anime_importer.domain.session import SessionSummary
 from anime_importer.ports import (
@@ -131,3 +136,96 @@ def build_services(
         franchise_finder=finder,
         resolution_buffer=settings.resolution_buffer,
     )
+
+
+class UnconfiguredServices:
+    """Stands in for SessionServices while the API keys are missing.
+
+    Past sessions can still be listed; creating or restoring one needs the keys.
+    """
+
+    def __init__(self, repository: SessionRepository) -> None:
+        self._repository = repository
+
+    def new_session(self, session_id: str, titles: Sequence[str]) -> ImportSession:
+        raise NotConfiguredError
+
+    def restore_session(self, session_id: str) -> ImportSession | None:
+        raise NotConfiguredError
+
+    def list_recent(self, limit: int) -> list[SessionSummary]:
+        return self._repository.list_recent(limit)
+
+
+def build_provider(
+    settings: Settings, repository: SessionRepository
+) -> SessionServices | UnconfiguredServices:
+    """Real services if the app can run (demo or all keys set); otherwise a placeholder."""
+    if settings.demo or not settings.missing_keys():
+        return build_services(settings, repository)
+    return UnconfiguredServices(repository)
+
+
+class FileConfigurator:
+    """Shows and saves the API keys. Writes only to the per-user config file.
+
+    If the app started unconfigured, saving the missing keys builds the real services and swaps
+    them into the registry. If it was already configured, the keys are saved but the running
+    adapters are kept (a second set would break "adapters once per app"): a restart is required.
+    """
+
+    def __init__(
+        self, registry: SessionRegistry, repository: SessionRepository, config_path: Path
+    ) -> None:
+        self._registry = registry
+        self._repository = repository
+        self._config_path = config_path
+        self._lock = threading.Lock()
+        settings = Settings()
+        self._demo = settings.demo
+        self._configured = settings.demo or not settings.missing_keys()
+        self._restart_required = False
+
+    @property
+    def configured(self) -> bool:
+        return self._configured
+
+    def status(self) -> ConfigView:
+        settings = Settings()
+        return ConfigView(
+            demo=self._demo,
+            configured=self._configured,
+            restart_required=self._restart_required,
+            keys=[
+                KeyStatusOut(name=k.name, source=k.source, masked=k.masked)
+                for k in key_status(settings, config_path=self._config_path)
+            ],
+        )
+
+    def save(self, updates: Mapping[str, str]) -> ConfigView:
+        if self._demo:
+            raise InvalidStateError("Demo mode does not use API keys")
+        with self._lock:
+            locked = {
+                k.name.lower(): k.source
+                for k in key_status(Settings(), config_path=self._config_path)
+                if k.source in (KeySource.ENVIRONMENT, KeySource.DOTENV)
+            }
+            for field in updates:
+                source = locked.get(field)
+                if source is not None:
+                    where = (
+                        "an environment variable"
+                        if source is KeySource.ENVIRONMENT
+                        else "the .env file"
+                    )
+                    raise InvalidStateError(f"{field.upper()} is set by {where}; change it there")
+            save_config(self._config_path, updates)
+            new_settings = Settings()
+            if not self._configured:
+                if not new_settings.missing_keys():
+                    self._registry.replace_services(build_services(new_settings, self._repository))
+                    self._configured = True
+            else:
+                self._restart_required = True
+            return self.status()

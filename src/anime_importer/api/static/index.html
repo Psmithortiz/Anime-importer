@@ -8,6 +8,10 @@
   </head>
   <body>
     <main>
+      <nav class="topbar">
+        <button id="settings-link" class="link-button" type="button" hidden>Settings</button>
+      </nav>
+
       <!-- 1. Start -->
       <section id="screen-start" hidden>
         <h1>Anime Importer</h1>
@@ -102,6 +106,19 @@
         <div class="row">
           <button id="retry-btn" class="primary" type="button">Retry</button>
           <button class="new-import" type="button">New import</button>
+        </div>
+      </section>
+
+      <!-- 6. Settings -->
+      <section id="screen-settings" hidden>
+        <h1>Settings</h1>
+        <p id="settings-intro" class="muted"></p>
+        <div id="settings-keys"></div>
+        <p id="settings-message" class="muted" hidden></p>
+        <p id="settings-error" class="error" hidden></p>
+        <div class="row">
+          <button id="settings-save-btn" class="primary" type="button">Save</button>
+          <button id="settings-back-btn" type="button" hidden>Back</button>
         </div>
       </section>
     </main>

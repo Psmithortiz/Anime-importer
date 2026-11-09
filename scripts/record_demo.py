@@ -25,6 +25,7 @@ from anime_importer.adapters.demo import (
 )
 from anime_importer.adapters.memory_repository import InMemorySessionRepository
 from anime_importer.bootstrap import build_real_adapters
+from anime_importer.cli import MISSING_KEYS_MESSAGE
 from anime_importer.config import Settings
 from anime_importer.domain.matching import match_candidates
 from anime_importer.domain.models import Franchise
@@ -39,6 +40,10 @@ DEMO_DATA_DIR = Path(__file__).resolve().parent.parent / "src/anime_importer/ada
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     settings = Settings(demo=False)
+    missing = settings.missing_keys()
+    if missing:
+        logging.getLogger(__name__).error(MISSING_KEYS_MESSAGE, ", ".join(missing))
+        return 2
     normalizer, searcher, details = build_real_adapters(settings)
     assert details is not None
     recording = DemoRecording()

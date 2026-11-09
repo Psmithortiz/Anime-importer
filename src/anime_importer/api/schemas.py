@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from anime_importer.config import KeySource
 from anime_importer.domain.models import (
     AiringStatus,
     ListStatus,
@@ -17,6 +18,7 @@ SessionStatus = Literal["preparing", "question", "finished", "failed"]
 
 class AppInfo(BaseModel):
     demo: bool
+    configured: bool = True
     sample_text: str | None = None
 
 
@@ -156,3 +158,34 @@ def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:
         preselected=sorted(step.preselected),
         used_fallback=step.used_fallback,
     )
+
+
+class KeyStatusOut(BaseModel):
+    name: str
+    source: KeySource
+    masked: str | None = None
+
+
+class ConfigView(BaseModel):
+    demo: bool
+    configured: bool
+    restart_required: bool
+    keys: list[KeyStatusOut]
+
+
+KeyValue = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200, pattern=r"^\S+$")
+]
+
+
+class ConfigUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gemini_api_key: KeyValue | None = None
+    mal_client_id: KeyValue | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> Self:
+        if self.gemini_api_key is None and self.mal_client_id is None:
+            raise ValueError("Provide at least one key")
+        return self

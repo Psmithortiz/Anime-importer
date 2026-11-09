@@ -206,6 +206,8 @@ docker compose up --build
 Open <http://127.0.0.1:8000>. It starts in demo mode. To use your own keys, put the `.env` file in
 the project root and run `DEMO=0 docker compose up` (PowerShell: `$env:DEMO="0"; docker compose up`).
 Normalization and MAL caches, and your sessions, are kept in Docker volumes between runs.
+Docker keeps using `.env` for the keys: they reach the container as environment variables, so the
+Settings link is hidden there.
 The sessions volume (`data`) is user data: unlike the cache volume, do not delete it to free space.
 
 ### Quick run (no clone)
@@ -228,12 +230,17 @@ cd Anime-importer
 uv sync
 ```
 
-Create a `.env` file in the project root:
+The app starts even without API keys and shows a **Settings** screen that asks for them (links
+to Google AI Studio and MAL's API page included). The keys are saved in the per-user config file
+(see below). Alternatively, set them yourself, for example in a `.env` file in the project root:
 
 ```
-GEMINI_API_KEY=your_gemini_key        # from Google AI Studio
+GEMINI_API_KEY=your_gemini_key        # from https://aistudio.google.com/apikey
 MAL_CLIENT_ID=your_mal_client_id      # from https://myanimelist.net/apiconfig
 ```
+
+The CLI (`anime-importer`) has no settings screen: without keys it names the missing ones and exits
+with code 2.
 
 Optional settings: `GEMINI_MODEL` and `GEMINI_CHUNK_SIZE` (default 20). The paths of the caches,
 sessions and config file are described below.
@@ -253,6 +260,21 @@ Settings are read in this order of priority (highest first): environment variabl
 config file (a JSON object such as `{"gemini_api_key": "...", "mal_client_id": "..."}`), and the
 defaults. A missing config file is ignored; an invalid one stops the app with an error naming it.
 Computing these paths creates nothing: folders are created when something is first written.
+
+**The Settings screen.** It shows where each key comes from (environment, `.env` or config file)
+and the last 4 characters of the saved key, never the full value. A key that comes from the
+environment or `.env` cannot be edited there (it would be overridden anyway): change it where it is
+defined. The link in the header is hidden in demo mode and when every key comes from the
+environment. If the app started without keys, saving them starts it right away. If it was already
+configured, the new keys are saved but the running app keeps the old ones until you restart it:
+the adapters (MAL throttle, caches) are built once per app, and a second set would share neither.
+The config file is created with owner-only permissions on Linux and macOS; on Windows it inherits
+the permissions of your user folder.
+
+**Host header check.** The web server only answers requests whose `Host` header is `127.0.0.1` or
+`localhost`. This protects the keys and your sessions from DNS rebinding (a web page making your
+browser talk to the local server under another name). If you expose the app under another name,
+add it with `ALLOWED_HOSTS` as a JSON list, e.g. `ALLOWED_HOSTS='["127.0.0.1","localhost","anime.lan"]'`.
 
 **Upgrading from an earlier version.** Caches used to live in `.cache/` inside the folder where the
 app was run. To keep them (and not spend Gemini quota again), move the contents of
