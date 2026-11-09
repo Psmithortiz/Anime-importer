@@ -118,6 +118,7 @@ function schedulePoll() {
 
 function render(view) {
   currentView = view;
+  setBusy(false);
   if (view.status === "preparing") {
     renderPreparing(view);
     schedulePoll();
@@ -151,7 +152,8 @@ function renderQuestion(view) {
   $("question-error").hidden = true;
   const isCandidate = question.kind === "candidate";
   $("confirm-btn").hidden = false;
-  $("question-help").textContent = "Click or 1-9 to select · Enter to confirm · X to discard";
+  $("question-help").textContent =
+    "Click or 1-9 to select · Enter to confirm · X to discard · Ctrl+Z to undo";
   $("question-help").hidden = false;
   updateConfirm();
 
@@ -430,6 +432,7 @@ function renderFinished(view) {
     );
   }
   updateDownloadLink();
+  $("finished-error").hidden = true;
   showScreen("finished");
 }
 
@@ -439,6 +442,7 @@ function updateDownloadLink() {
 
 function renderFailed(view) {
   $("failed-msg").textContent = view.error || "An unexpected error occurred.";
+  $("failed-error").hidden = true;
   showScreen("failed");
 }
 
@@ -450,7 +454,16 @@ function setBusy(flag) {
   $("discard-btn").disabled = flag;
   $("lookup-msg").hidden = !flag;
   for (const select of document.querySelectorAll("#options select")) select.disabled = flag;
+  $("retry-btn").disabled = flag;
+  updateUndoButtons();
   updateConfirm();
+}
+
+// Undo is only possible when the server says so and no request is in flight.
+function updateUndoButtons() {
+  const disabled = busy || !currentView || !currentView.can_undo;
+  $("undo-btn").disabled = disabled;
+  $("undo-finished-btn").disabled = disabled;
 }
 
 // Run a choose/discard action, blocking the UI and the shortcuts while it is in flight.
@@ -494,6 +507,98 @@ function discard() {
   return api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/discard`);
 }
 
+function canUndoNow() {
+  return (
+    !busy &&
+    currentView !== null &&
+    (currentView.status === "question" || currentView.status === "finished") &&
+    currentView.can_undo === true
+  );
+}
+
+async function undo() {
+  if (!canUndoNow()) return;
+  const errorBox = $(currentView.status === "question" ? "question-error" : "finished-error");
+  errorBox.hidden = true;
+  setBusy(true);
+  try {
+    render(await api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/undo`));
+  } catch (error) {
+    // 409 / 503: the screen does not change, the message is shown on it.
+    errorBox.textContent = error.message;
+    errorBox.hidden = false;
+    setBusy(false);
+  }
+}
+
+async function retry() {
+  if (busy || !currentView || currentView.status !== "failed") return;
+  $("failed-error").hidden = true;
+  setBusy(true);
+  try {
+    render(await api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/retry`));
+  } catch (error) {
+    $("failed-error").textContent = error.message;
+    $("failed-error").hidden = false;
+    setBusy(false);
+  }
+}
+
+// Open an existing session (from the URL hash or from the recent list).
+async function openSession(id) {
+  if (busy) return;
+  busy = true;
+  sessionId = id;
+  try {
+    const view = await api("GET", `/api/sessions/${encodeURIComponent(id)}`);
+    location.hash = id;
+    render(view);
+  } catch (error) {
+    goToStart();
+    if (error.status !== 404) {
+      $("start-error").textContent = error.message;
+      $("start-error").hidden = false;
+    }
+  } finally {
+    busy = false;
+  }
+}
+
+function recentSummary(item) {
+  const titles = item.preview.join(" · ");
+  return item.title_count > 3 ? `${titles} and ${item.title_count - 3} more` : titles;
+}
+
+function buildRecentItem(item) {
+  const answers = `${item.decision_count} ${item.decision_count === 1 ? "answer" : "answers"}`;
+  const when = new Date(item.updated_at).toLocaleString();
+  const row = el("li", { className: "recent-item" }, [
+    el("span", { text: recentSummary(item), className: "recent-titles" }),
+    el("span", { text: `${answers} · ${when}`, className: "muted small" }),
+  ]);
+  row.setAttribute("role", "button");
+  row.setAttribute("tabindex", "0");
+  row.addEventListener("click", () => openSession(item.id));
+  row.addEventListener("keydown", (event) => {
+    if (event.target === row && event.key === "Enter") {
+      event.preventDefault();
+      openSession(item.id);
+    }
+  });
+  return row;
+}
+
+async function loadRecent() {
+  try {
+    const items = await api("GET", "/api/sessions?limit=10");
+    $("recent-list").replaceChildren(...items.map(buildRecentItem));
+    $("recent").hidden = items.length === 0;
+  } catch {
+    // The list is optional: without it the start screen works as before.
+    $("recent").hidden = true;
+  }
+}
+
 function countLines(text) {
   return text.split(/\r?\n/).filter((line) => line.trim() !== "").length;
 }
@@ -513,6 +618,7 @@ function goToStart() {
   $("poll-warning").hidden = true;
   updateLineCount();
   showScreen("start");
+  loadRecent();
 }
 
 async function startImport() {
@@ -532,10 +638,25 @@ async function startImport() {
 }
 
 function onKeydown(event) {
-  if (busy || !currentView || currentView.status !== "question") return;
-  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!currentView) return;
   const target = event.target;
   if (target instanceof HTMLElement && target.matches("input, textarea, select")) return;
+
+  const isUndo =
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    (event.key || "").toLowerCase() === "z";
+  if (isUndo) {
+    if (currentView.status === "question" || currentView.status === "finished") {
+      event.preventDefault();
+      undo();
+    }
+    return;
+  }
+
+  if (busy || currentView.status !== "question") return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
 
   if (event.key === "x" || event.key === "X") {
     event.preventDefault();
@@ -598,6 +719,9 @@ async function init() {
   $("start-btn").addEventListener("click", startImport);
   $("discard-btn").addEventListener("click", () => submit(discard));
   $("confirm-btn").addEventListener("click", confirmSelection);
+  $("undo-btn").addEventListener("click", undo);
+  $("undo-finished-btn").addEventListener("click", undo);
+  $("retry-btn").addEventListener("click", retry);
   for (const button of document.querySelectorAll(".new-import")) {
     button.addEventListener("click", goToStart);
   }
@@ -610,16 +734,7 @@ async function init() {
     goToStart();
     return;
   }
-  sessionId = id;
-  try {
-    render(await api("GET", `/api/sessions/${encodeURIComponent(id)}`));
-  } catch (error) {
-    goToStart();
-    if (error.status !== 404) {
-      $("start-error").textContent = error.message;
-      $("start-error").hidden = false;
-    }
-  }
+  await openSession(id);
 }
 
 init();

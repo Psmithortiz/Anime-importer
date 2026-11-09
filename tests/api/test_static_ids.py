@@ -1,0 +1,21 @@
+import re
+from pathlib import Path
+
+STATIC = Path(__file__).resolve().parents[2] / "src" / "anime_importer" / "api" / "static"
+
+
+def test_every_element_id_used_by_the_script_exists_in_the_page():
+    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    page = (STATIC / "index.html").read_text(encoding="utf-8")
+
+    used = set(re.findall(r'\$\("([a-z][a-z0-9-]*)"\)', script))
+    defined = set(re.findall(r'\bid="([^"]+)"', page))
+
+    assert used - defined == set()
+
+
+def test_the_script_never_inserts_markup_with_innerhtml():
+    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    code = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("//"))
+
+    assert "innerHTML" not in code
