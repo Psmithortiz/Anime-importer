@@ -46,7 +46,7 @@ The 3 remaining lines each exposed a different issue; see
 - **Franchise discovery**: sequels, prequels, OVAs and movies next to the candidates, so one line can import a whole series.
 - **Look-ahead resolution**: a background worker resolves upcoming titles while you answer.
 - **Keyboard-first** (`1`–`9`, `Enter`, `X`) and **unlimited undo** with `Ctrl+Z`, also after the last question.
-- **Resumable sessions** in SQLite, a recent-sessions list and one-click **retry when MAL fails**.
+- **Resumable sessions** in SQLite, a recent-sessions list where sessions can be deleted, and one-click **retry when MAL fails**.
 - **REST API** documented at `/docs`, plus an interactive CLI.
 - **Demo mode** (`DEMO=1`): replays recorded Gemini and MAL responses, no API keys needed.
 
