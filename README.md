@@ -99,7 +99,7 @@ All design decisions: [docs/design-decisions.md](docs/design-decisions.md)
 Download `AnimeImporter-vX.Y.Z-windows-x64.zip` from **Assets** in the
 [latest release](https://github.com/Psmithortiz/Anime-importer/releases/latest) (not "Source code"),
 unzip it and run `AnimeImporter.exe`. The executable is not signed, so Windows may show a SmartScreen
-warning: see [how to run it anyway](docs/setup.md#windows-app-no-python-needed).
+warning: see [how to run it anyway](docs/setup.md#windows-app).
 
 ### Demo without API keys (Docker)
 
@@ -129,9 +129,10 @@ Every option, configuration and the CLI: [docs/setup.md](docs/setup.md)
 ```bash
 uv run pytest
 uv run ruff check src tests scripts
+uv run ruff format --check src tests scripts
 ```
 
-The suite runs without network access or API keys. More in [docs/setup.md](docs/setup.md#testing).
+The suite runs without network access or API keys. More in [docs/development.md](docs/development.md#tests-and-lint).
 
 ## Roadmap
 
