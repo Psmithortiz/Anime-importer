@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from dotenv import dotenv_values
 from platformdirs import user_cache_path, user_config_path, user_data_path
 from pydantic import Field
 from pydantic_settings import (
@@ -35,9 +34,9 @@ def config_file_path() -> Path:
 
 
 class Settings(BaseSettings):
-    """Configuration from init values, environment, .env and the per-user config file."""
+    """Configuration from init values, environment and the per-user config file."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(extra="ignore")
 
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
@@ -66,7 +65,7 @@ class Settings(BaseSettings):
         settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,  # unused: no .env file is read
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         path = config_file_path()
@@ -74,7 +73,6 @@ class Settings(BaseSettings):
         return (
             init_settings,
             env_settings,
-            dotenv_settings,
             JsonConfigSettingsSource(settings_cls, json_file=path),
             file_secret_settings,
         )
@@ -94,7 +92,6 @@ class Settings(BaseSettings):
 
 class KeySource(StrEnum):
     ENVIRONMENT = "environment"
-    DOTENV = "dotenv"
     CONFIG_FILE = "config_file"
     MISSING = "missing"
 
@@ -113,14 +110,12 @@ def mask_key(value: str) -> str:
 
 def key_status(
     settings: Settings,
-    env_file: str | Path = ".env",
     config_path: Path | None = None,
 ) -> list[KeyStatus]:
-    """Where each API key comes from, in priority order: environment, .env, config file.
+    """Where each API key comes from, in priority order: environment, config file.
 
     Never returns a full key.
     """
-    dotenv = dotenv_values(env_file)
     try:
         in_file = read_config(config_path or config_file_path())
     except ValueError:
@@ -131,8 +126,6 @@ def key_status(
             result.append(KeyStatus(name, KeySource.MISSING, None))
         elif os.environ.get(name):
             result.append(KeyStatus(name, KeySource.ENVIRONMENT, mask_key(value)))
-        elif dotenv.get(name):
-            result.append(KeyStatus(name, KeySource.DOTENV, mask_key(value)))
         elif in_file.get(name.lower()):
             result.append(KeyStatus(name, KeySource.CONFIG_FILE, mask_key(value)))
         else:

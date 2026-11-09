@@ -16,8 +16,8 @@ from anime_importer.services.import_session import ImportSession
 logger = logging.getLogger(__name__)
 
 MISSING_KEYS_MESSAGE = (
-    "Missing required settings: %s. Set them as environment variables, in a .env file in the "
-    "current folder, or in the config file (run the web app and use its Settings screen)."
+    "Missing required settings: %s. Set them in the Settings screen of the web app, in the "
+    "config file or as environment variables."
 )
 
 

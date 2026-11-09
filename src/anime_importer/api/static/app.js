@@ -720,7 +720,6 @@ const KEY_LABELS = {
 
 const SOURCE_TEXT = {
   environment: "Set by an environment variable",
-  dotenv: "Set in the .env file",
   config_file: "saved in the config file",
   missing: "Not set",
 };
@@ -735,7 +734,7 @@ function renderSettings(config) {
   for (const key of config.keys) {
     const meta = KEY_LABELS[key.name];
     if (!meta) continue;
-    const locked = key.source === "environment" || key.source === "dotenv";
+    const locked = key.source === "environment";
     const inputId = `settings-${meta.field}`;
     const input = el("input", {
       attrs: { id: inputId, type: "password", autocomplete: "off", spellcheck: "false" },
@@ -833,7 +832,7 @@ async function refreshSettingsLink(info) {
   } catch {
     return; // Without the endpoint there is nothing to configure.
   }
-  const editable = config.keys.some((key) => key.source !== "environment" && key.source !== "dotenv");
+  const editable = config.keys.some((key) => key.source !== "environment");
   settingsLinkAvailable = editable;
   updateSettingsLink();
 }
