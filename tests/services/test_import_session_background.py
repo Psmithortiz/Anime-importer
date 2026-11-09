@@ -1,6 +1,7 @@
 import threading
 
 import pytest
+from session_helpers import make_session
 
 from anime_importer.domain.models import (
     AnimeCandidate,
@@ -9,12 +10,8 @@ from anime_importer.domain.models import (
     ListStatus,
     NormalizedTitle,
 )
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-    ResolutionError,
-)
+from anime_importer.domain.session import CandidateChoice, Finished
+from anime_importer.services.import_session import ResolutionError
 
 TIMEOUT = 2.0
 
@@ -55,7 +52,7 @@ def test_advancing_never_calls_searcher_or_finder():
         {"Hellsing": TIE, "Naruto": TIE, "Bleach": [AnimeCandidate(3, "Bleach")]}
     )
     finder = CountingFinder()
-    session = ImportSession(
+    session = make_session(
         ["Hellsing", "Naruto", "Bleach"],
         Normalizer(),
         searcher,
@@ -78,7 +75,7 @@ def test_order_and_last_wins_are_kept():
         "B": [AnimeCandidate(6, "B")],
         "C": [AnimeCandidate(5, "C")],
     }
-    session = ImportSession(
+    session = make_session(
         ["A", "B", "C"], Normalizer(), CountingSearcher(results), run_in_background=sync
     )
 
@@ -92,7 +89,7 @@ def test_order_and_last_wins_are_kept():
 
 
 def test_resolution_progress_reaches_total():
-    session = ImportSession(
+    session = make_session(
         ["A", "B", "C"], Normalizer(), CountingSearcher({}), run_in_background=sync
     )
     assert session.resolution_progress is None
@@ -110,7 +107,7 @@ class ExplodingSearcher:
 
 
 def test_unexpected_worker_error_raises_resolution_error_when_reached():
-    session = ImportSession(["A", "B"], Normalizer(), ExplodingSearcher(), run_in_background=sync)
+    session = make_session(["A", "B"], Normalizer(), ExplodingSearcher(), run_in_background=sync)
 
     with pytest.raises(ResolutionError) as exc_info:
         session.start()
@@ -127,7 +124,7 @@ def test_real_thread_start_does_not_wait_for_the_whole_list():
                 assert release.wait(TIMEOUT), "test never released the searcher"
             return TIE if query == "A" else [AnimeCandidate(len(query) + ord(query), query)]
 
-    session = ImportSession(
+    session = make_session(
         ["A", "B", "C", "D"], Normalizer(), BlockingSearcher(), resolution_buffer=2
     )
     result: list = []

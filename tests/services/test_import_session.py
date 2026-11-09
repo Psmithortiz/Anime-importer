@@ -1,4 +1,5 @@
 import pytest
+from session_helpers import make_session
 
 from anime_importer.domain.models import (
     AiringStatus,
@@ -7,13 +8,8 @@ from anime_importer.domain.models import (
     ListStatus,
     NormalizedTitle,
 )
+from anime_importer.domain.session import CandidateChoice, Finished, NormalizationChoice
 from anime_importer.ports import SearchError
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-    NormalizationChoice,
-)
 
 
 class FakeNormalizer:
@@ -46,7 +42,7 @@ class ProgressNormalizer:
 
 
 def test_exposes_normalization_progress_after_start():
-    session = ImportSession(
+    session = make_session(
         ["a", "b"], ProgressNormalizer(), FakeSearcher({}), run_in_background=lambda fn: fn()
     )
     assert session.normalization_progress is None
@@ -59,7 +55,7 @@ def test_exposes_normalization_progress_after_start():
 def _session(titles, normalized, results):
     searcher = FakeSearcher(results)
     return (
-        ImportSession(
+        make_session(
             titles, FakeNormalizer(normalized), searcher, run_in_background=lambda fn: fn()
         ),
         searcher,
@@ -267,7 +263,7 @@ def test_start_twice_raises():
 
 def test_empty_title_list_raises():
     with pytest.raises(ValueError):
-        ImportSession([], FakeNormalizer([]), FakeSearcher({}))
+        make_session([], FakeNormalizer([]), FakeSearcher({}))
 
 
 def test_progress_advances_with_resolved_titles():

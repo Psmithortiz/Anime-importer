@@ -20,6 +20,10 @@
         </div>
         <p id="start-error" class="error" hidden></p>
         <button id="start-btn" class="primary" type="button" disabled>Start import</button>
+        <section id="recent" class="recent" hidden>
+          <h2>Recent sessions</h2>
+          <ul id="recent-list" class="recent-list"></ul>
+        </section>
       </section>
 
       <!-- 2. Preparing -->
@@ -52,7 +56,7 @@
         <div id="options"></div>
         <div id="question-actions" class="actions">
           <p id="question-help" class="muted small" hidden>
-            Click or 1-9 to select · Enter to confirm · X to discard
+            Click or 1-9 to select · Enter to confirm · X to discard · Ctrl+Z to undo
           </p>
           <p id="lookup-msg" class="muted small" hidden>Looking up the next titles on MAL…</p>
           <p id="question-error" class="error" hidden></p>
@@ -61,6 +65,7 @@
               Confirm selection (Enter)
             </button>
             <button id="discard-btn" class="danger" type="button">Discard (X)</button>
+            <button id="undo-btn" type="button" disabled>Undo (Ctrl+Z)</button>
           </div>
         </div>
       </section>
@@ -79,8 +84,12 @@
           >, choose "MyAnimeList Import", select this file and check "Don't overwrite entries
           already on my list" to keep your current list unchanged.
         </aside>
+        <p id="finished-error" class="error" hidden></p>
         <div class="row">
           <a id="download-link" class="button primary" download="anime_import.xml">Download XML</a>
+          <button id="undo-finished-btn" type="button" disabled>
+            Undo last answer (Ctrl+Z)
+          </button>
           <button class="new-import" type="button">New import</button>
         </div>
       </section>
@@ -89,7 +98,11 @@
       <section id="screen-failed" hidden>
         <h1>The import failed</h1>
         <p id="failed-msg" class="error"></p>
-        <button class="new-import" type="button">New import</button>
+        <p id="failed-error" class="error" hidden></p>
+        <div class="row">
+          <button id="retry-btn" class="primary" type="button">Retry</button>
+          <button class="new-import" type="button">New import</button>
+        </div>
       </section>
     </main>
     <script src="/app.js"></script>

@@ -1,9 +1,13 @@
 from pathlib import Path
 
+from session_helpers import make_session
+
+from anime_importer.bootstrap import SessionServices
 from anime_importer.cli import ask_option, describe_question, main, run_interactive
 from anime_importer.config import Settings
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
-from anime_importer.services.import_session import CandidateChoice, Finished, ImportSession
+from anime_importer.domain.session import CandidateChoice, Finished
+from anime_importer.services.import_session import ImportSession
 
 
 class FakeNormalizer:
@@ -17,7 +21,7 @@ class FakeSearcher:
 
 
 def _session() -> ImportSession:
-    return ImportSession(
+    return make_session(
         ["hellsing"], FakeNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
     )
 
@@ -105,9 +109,14 @@ def test_main_writes_xml_with_update_on_import_one(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setenv("MAL_CLIENT_ID", "m")
     monkeypatch.setattr(
-        "anime_importer.cli.build_session",
-        lambda settings, titles, with_franchise=True: ImportSession(
-            titles, _AutoNormalizer(), _AutoSearcher(), run_in_background=lambda fn: fn()
+        "anime_importer.cli.build_services",
+        lambda settings, repository, with_franchise=True: SessionServices(
+            repository=repository,
+            normalizer=_AutoNormalizer(),
+            searcher=_AutoSearcher(),
+            franchise_finder=None,
+            resolution_buffer=20,
+            run_in_background=lambda fn: fn(),
         ),
     )
     titles = tmp_path / "list.txt"

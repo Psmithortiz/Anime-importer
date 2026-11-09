@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -9,7 +10,7 @@ from anime_importer.domain.models import (
     RelationType,
     suggest_list_status,
 )
-from anime_importer.services.import_session import CandidateChoice, NormalizationChoice
+from anime_importer.domain.session import CandidateChoice, NormalizationChoice
 
 SessionStatus = Literal["preparing", "question", "finished", "failed"]
 
@@ -97,6 +98,16 @@ class SessionView(BaseModel):
     error: str | None = None
     question: QuestionOut | None = None
     summary: SummaryOut | None = None
+    can_undo: bool = False
+
+
+class SessionSummaryOut(BaseModel):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    title_count: int
+    preview: list[str]
+    decision_count: int
 
 
 def question_out(step: NormalizationChoice | CandidateChoice) -> QuestionOut:

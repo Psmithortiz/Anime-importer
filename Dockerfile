@@ -18,12 +18,14 @@ RUN uv sync --locked --no-dev --no-editable
 # ---- runtime: only the virtual environment, as a non-root user
 FROM python:3.13-slim
 RUN useradd --create-home app \
-    && mkdir -p /home/app/.cache \
-    && chown app:app /home/app/.cache
+    && mkdir -p /home/app/.cache /home/app/data \
+    && chown app:app /home/app/.cache /home/app/data
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    HOST=0.0.0.0
+    HOST=0.0.0.0 \
+    DATABASE_PATH=/home/app/data/sessions.db \
+    DEMO_DATABASE_PATH=/home/app/data/demo.db
 USER app
 WORKDIR /home/app
 EXPOSE 8000

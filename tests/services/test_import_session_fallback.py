@@ -1,10 +1,8 @@
+from session_helpers import make_session
+
 from anime_importer.domain.models import AnimeCandidate, ImportedAnime, NormalizedTitle
+from anime_importer.domain.session import CandidateChoice, Finished
 from anime_importer.ports import SearchError
-from anime_importer.services.import_session import (
-    CandidateChoice,
-    Finished,
-    ImportSession,
-)
 
 
 class Normalizer:
@@ -30,7 +28,7 @@ class Searcher:
 
 def _session(original: str, romaji: str, results):
     searcher = Searcher(results)
-    session = ImportSession(
+    session = make_session(
         [original], Normalizer(romaji), searcher, run_in_background=lambda fn: fn()
     )
     return session, searcher
@@ -106,7 +104,7 @@ def test_fallback_also_applies_to_a_query_chosen_from_a_normalization_menu():
             return [NormalizedTitle(1, "X", ambiguous=True, options=("Option A", "Option B"))]
 
     searcher = Searcher({"my line": TIE})
-    session = ImportSession(
+    session = make_session(
         ["my line"], AmbiguousNormalizer(), searcher, run_in_background=lambda fn: fn()
     )
     session.start()

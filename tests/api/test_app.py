@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
+from session_helpers import make_registry, make_session
 
 from anime_importer.api.app import create_app
 from anime_importer.api.registry import ManagedSession
 from anime_importer.domain.models import AiringStatus, AnimeCandidate, MediaType, NormalizedTitle
 from anime_importer.ports import NormalizationError
-from anime_importer.services.import_session import ImportSession
 
 RESULTS = {
     "hellsing": [
@@ -38,15 +38,7 @@ class FakeSearcher:
 
 
 def _client(normalizer=None) -> TestClient:
-    def factory(titles):
-        return ImportSession(
-            titles,
-            normalizer or FakeNormalizer(),
-            FakeSearcher(),
-            run_in_background=lambda fn: fn(),
-        )
-
-    return TestClient(create_app(factory))
+    return TestClient(create_app(make_registry(normalizer or FakeNormalizer(), FakeSearcher())))
 
 
 def _create(client: TestClient, text: str = "hellsing") -> str:
@@ -295,7 +287,7 @@ def test_final_view_has_no_normalization_progress():
 
 
 def test_view_includes_normalization_progress_while_preparing():
-    session = ImportSession(
+    session = make_session(
         ["a", "b", "c"], ProgressNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
     )
     session.start()  # reports (3, 3)
@@ -314,12 +306,7 @@ class ExplodingSearcher:
 
 
 def test_unexpected_resolution_error_leaves_the_session_failed():
-    def factory(titles):
-        return ImportSession(
-            titles, FakeNormalizer(), ExplodingSearcher(), run_in_background=lambda fn: fn()
-        )
-
-    client = TestClient(create_app(factory))
+    client = TestClient(create_app(make_registry(FakeNormalizer(), ExplodingSearcher())))
     session_id = client.post("/api/sessions", json={"text": "a"}).json()["id"]
 
     view = client.get(f"/api/sessions/{session_id}").json()
@@ -335,12 +322,7 @@ def test_choose_that_hits_a_resolution_error_marks_failed_without_raising():
                 raise RuntimeError("boom")
             return RESULTS["hellsing"]
 
-    def factory(titles):
-        return ImportSession(
-            titles, FakeNormalizer(), FlakySearcher(), run_in_background=lambda fn: fn()
-        )
-
-    client = TestClient(create_app(factory))
+    client = TestClient(create_app(make_registry(FakeNormalizer(), FlakySearcher())))
     session_id = client.post("/api/sessions", json={"text": "hellsing\nb"}).json()["id"]
     assert client.get(f"/api/sessions/{session_id}").json()["status"] == "question"
 
@@ -351,7 +333,7 @@ def test_choose_that_hits_a_resolution_error_marks_failed_without_raising():
 
 
 def test_view_includes_resolution_progress_while_preparing():
-    session = ImportSession(
+    session = make_session(
         ["a", "b"], FakeNormalizer(), FakeSearcher(), run_in_background=lambda fn: fn()
     )
     session.start()
@@ -373,6 +355,55 @@ SAMPLE = "Hellsing" + chr(10) + "Naruto" + chr(10)
 
 
 def test_info_with_demo_text():
-    client = TestClient(create_app(lambda titles: None, demo_text=SAMPLE))
+    client = TestClient(
+        create_app(make_registry(FakeNormalizer(), FakeSearcher()), demo_text=SAMPLE)
+    )
 
     assert client.get("/api/info").json() == {"demo": True, "sample_text": SAMPLE}
+
+
+class _StubSession:
+    """Session whose snapshot is fixed, to check that view() derives the status from it."""
+
+    normalization_progress = None
+    resolution_progress = None
+    can_undo = False
+
+    def __init__(self, snapshot) -> None:
+        self._snapshot = snapshot
+
+    def snapshot(self):
+        return self._snapshot
+
+
+def test_view_derives_question_status_from_the_snapshot():
+    from anime_importer.domain.session import CandidateChoice
+    from anime_importer.services.import_session import SessionSnapshot
+
+    question = CandidateChoice("a", "a", (AnimeCandidate(1, "A"), AnimeCandidate(2, "A")))
+    managed = ManagedSession(
+        id="x", session=_StubSession(SessionSnapshot(0, 1, question)), status="finished"
+    )
+
+    view = managed.view()
+
+    assert view.status == "question"
+    assert view.question is not None
+    assert view.summary is None
+
+
+def test_view_derives_finished_status_from_the_snapshot():
+    from anime_importer.domain.session import Finished
+    from anime_importer.services.import_session import SessionSnapshot
+
+    managed = ManagedSession(
+        id="x",
+        session=_StubSession(SessionSnapshot(1, 1, Finished(imported=(), rejected=()))),
+        status="question",
+    )
+
+    view = managed.view()
+
+    assert view.status == "finished"
+    assert view.summary is not None
+    assert view.question is None

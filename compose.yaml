@@ -14,6 +14,9 @@ services:
     volumes:
       # Keeps the normalization and details caches between restarts.
       - cache:/home/app/.cache
+      # User data (sessions), unlike the cache volume it should not be deleted to free space.
+      - data:/home/app/data
 
 volumes:
   cache:
+  data:

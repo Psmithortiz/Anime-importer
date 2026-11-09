@@ -42,7 +42,11 @@ jobs:
         run: |
           docker run -d --name app -p 8000:8000 -e DEMO=1 anime-importer
           for _ in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8000/api/info; then exit 0; fi
+            # /api/sessions proves the database could be created by the non-root user.
+            if curl -fsS http://127.0.0.1:8000/api/info \
+              && curl -fsS http://127.0.0.1:8000/api/sessions; then
+              exit 0
+            fi
             sleep 1
           done
           docker logs app
