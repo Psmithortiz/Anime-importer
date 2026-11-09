@@ -6,9 +6,9 @@ services:
       # Published on 127.0.0.1 only: the app has no authentication.
       - "127.0.0.1:8000:8000"
     environment:
-      # Demo mode by default. For the real mode run `DEMO=0 docker compose up` and enter your
-      # API keys in the Settings screen (they are saved in the data volume).
-      DEMO: ${DEMO:-1}
+      # Normal mode by default: the app asks for the API keys in its Settings screen (they are
+      # saved in the data volume). For the demo run `DEMO=1 docker compose up`.
+      DEMO: ${DEMO:-0}
     volumes:
       # Keeps the normalization and details caches between restarts.
       - cache:/home/app/.cache

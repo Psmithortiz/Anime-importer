@@ -129,8 +129,8 @@ docker pull ghcr.io/psmithortiz/anime-importer:latest
 
    | | macOS / Linux (bash) | Windows (PowerShell) |
    | --- | --- | --- |
-   | Demo, no keys | `docker compose up --build` | `docker compose up --build` |
-   | With your keys | `DEMO=0 docker compose up --build` | `$env:DEMO="0"; docker compose up --build` |
+   | With your keys | `docker compose up --build` | `docker compose up --build` |
+   | Demo, no keys | `DEMO=1 docker compose up --build` | `$env:DEMO="1"; docker compose up --build` |
 
    The first build takes a few minutes; later starts take seconds. When the log shows
    `Application startup complete`, open <http://127.0.0.1:8000> in your browser. With your keys, the

@@ -112,7 +112,13 @@ docker run --rm -e DEMO=1 -p 127.0.0.1:8000:8000 ghcr.io/psmithortiz/anime-impor
 Or building from the source with Compose:
 
 ```bash
-docker compose up --build
+DEMO=1 docker compose up --build
+```
+
+On Windows (PowerShell):
+
+```powershell
+$env:DEMO="1"; docker compose up --build
 ```
 
 Open <http://127.0.0.1:8000>: it starts in demo mode with a sample list.
