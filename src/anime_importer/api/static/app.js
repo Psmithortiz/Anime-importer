@@ -853,7 +853,10 @@ async function loadInfo() {
 }
 
 async function init() {
-  $("titles-input").addEventListener("input", updateLineCount);
+  $("titles-input").addEventListener("input", () => {
+    $("file-name").textContent = "";
+    updateLineCount();
+  });
   $("file-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
     $("file-name").textContent = file ? file.name : "";
