@@ -82,10 +82,20 @@ function externalLink(text, href, className = "small-link") {
   return link;
 }
 
+let currentScreen = null;
+// Whether the Settings link makes sense at all (not in demo, not if every key is fixed elsewhere).
+let settingsLinkAvailable = false;
+
+function updateSettingsLink() {
+  $("settings-link").hidden = !settingsLinkAvailable || currentScreen === "settings";
+}
+
 function showScreen(name) {
   for (const screen of SCREENS) {
     $(`screen-${screen}`).hidden = screen !== name;
   }
+  currentScreen = name;
+  updateSettingsLink();
 }
 
 // ---------------------------------------------------------------- polling
@@ -711,7 +721,7 @@ const KEY_LABELS = {
 const SOURCE_TEXT = {
   environment: "Set by an environment variable",
   dotenv: "Set in the .env file",
-  config_file: "Saved in the config file",
+  config_file: "saved in the config file",
   missing: "Not set",
 };
 
@@ -732,7 +742,9 @@ function renderSettings(config) {
     });
     input.disabled = locked;
     settingsInputs.set(meta.field, input);
-    const current = key.masked ? `${SOURCE_TEXT[key.source]} (${key.masked})` : SOURCE_TEXT[key.source];
+    const current = key.masked
+      ? `${key.masked} · ${SOURCE_TEXT[key.source]}`
+      : SOURCE_TEXT[key.source];
     const link = el("a", {
       text: "Get one",
       className: "small-link",
@@ -742,8 +754,10 @@ function renderSettings(config) {
       el("div", { className: "key-field" }, [
         el("label", { text: meta.label, attrs: { for: inputId } }),
         input,
-        el("p", { text: current, className: "muted small" }),
-        link,
+        el("p", { className: "muted small key-status" }, [
+          el("span", { text: `${current} · ` }),
+          link,
+        ]),
       ]),
     );
   }
@@ -810,7 +824,8 @@ async function saveSettings() {
 
 // The Settings link is useless in demo mode and when every key is fixed by the environment.
 async function refreshSettingsLink(info) {
-  $("settings-link").hidden = true;
+  settingsLinkAvailable = false;
+  updateSettingsLink();
   if (info.demo) return;
   let config;
   try {
@@ -819,7 +834,8 @@ async function refreshSettingsLink(info) {
     return; // Without the endpoint there is nothing to configure.
   }
   const editable = config.keys.some((key) => key.source !== "environment" && key.source !== "dotenv");
-  $("settings-link").hidden = !editable;
+  settingsLinkAvailable = editable;
+  updateSettingsLink();
 }
 
 async function loadInfo() {

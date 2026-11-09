@@ -74,7 +74,10 @@ a {
   margin: 0.75rem 0;
 }
 
-textarea {
+textarea,
+input[type="text"],
+input[type="password"] {
+  box-sizing: border-box;
   width: 100%;
   padding: 0.75rem;
   background: var(--surface);
@@ -83,6 +86,13 @@ textarea {
   border-radius: 0.5rem;
   font: inherit;
   resize: vertical;
+}
+
+textarea:focus-visible,
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
 }
 
 button,
@@ -558,7 +568,7 @@ th {
 }
 
 .key-field {
-  margin: 1rem 0;
+  margin: 0.75rem 0;
 }
 
 .key-field label {
@@ -567,7 +577,6 @@ th {
   margin-bottom: 0.25rem;
 }
 
-.key-field input {
-  width: 100%;
-  box-sizing: border-box;
+.key-status {
+  margin: 0.25rem 0 0;
 }
