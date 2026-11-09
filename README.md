@@ -180,9 +180,32 @@ caches and secrets can never end up in the image; keys are entered at run time. 
 only inside the container (through the `HOST` setting, so there is still a single entry point),
 and compose publishes it on `127.0.0.1` only, because the app has no authentication.
 
+**A desktop launcher without races.** The launcher binds the socket itself and hands it to uvicorn.
+Because it is already listening, the browser can be opened immediately (the OS queues the connection
+until the server accepts it), and there is no gap between "check that the port is free" and "use
+it". If the port is taken, the launcher asks `/api/info` to tell one of its own instances from
+another program. On Windows it uses `SO_EXCLUSIVEADDRUSE`, because `SO_REUSEADDR` would let a second
+process take a port that is already in use.
+
 ## Setup
 
-Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
+### Windows app (no Python needed)
+
+Download the zip from the [Releases](https://github.com/Psmithortiz/Anime-importer/releases) page,
+unzip it and run `AnimeImporter.exe`. The `.exe` needs the `_internal` folder next to it: move the
+whole `AnimeImporter` folder, or make a shortcut to the `.exe`, but never the `.exe` alone. A console
+window opens together with your browser; closing the console stops the app. The first time, the
+Settings screen asks for your API keys. To try the demo without keys, open PowerShell in that folder
+and run `$env:DEMO="1"; .\AnimeImporter.exe`.
+
+The executable is not signed, so Windows may show "Windows protected your PC" (SmartScreen). Click
+"More info" and then "Run anyway". To check that the zip is the one that was published, compare
+`Get-FileHash <zip> -Algorithm SHA256` with the `.sha256` file of the release.
+
+macOS and Linux users can use [Docker](#docker), [uvx](#quick-run-no-clone) or the
+[source code](#from-source).
+
+The rest of the options below require Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
 ### Try it without API keys
 
@@ -248,6 +271,10 @@ with code 2.
 
 Optional settings: `GEMINI_MODEL` and `GEMINI_CHUNK_SIZE` (default 20). The paths of the caches,
 sessions and config file are described below.
+
+To build the Windows executable locally:
+`uv run --group build pyinstaller packaging/anime-importer.spec --noconfirm` (the result is in
+`dist/AnimeImporter/`).
 
 ### Where files are stored
 
@@ -342,6 +369,12 @@ cover reopening a file, schema versions and cascading deletes.
 
 CI runs both commands on Ubuntu and Windows for every pull request, and builds the Docker image
 with a demo-mode smoke test.
+
+## Known limitations
+
+- The desktop launcher only detects an already running instance on port 8000. If another program
+  uses 8000, every launch opens a new instance on a free port. SQLite in WAL mode prevents
+  corruption, but it is best to use a single window.
 
 ## Roadmap
 
