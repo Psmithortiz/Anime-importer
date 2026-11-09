@@ -39,3 +39,17 @@ def test_static_files_are_revalidated_but_the_api_is_untouched():
     assert again.status_code == 304
 
     assert "Cache-Control" not in client.get("/api/info").headers
+
+
+def test_icon_files_are_served():
+    from fastapi.testclient import TestClient
+    from session_helpers import make_registry
+
+    from anime_importer.api.app import create_app
+
+    client = TestClient(create_app(make_registry(None, None)))
+
+    assert client.get("/favicon.ico").status_code == 200
+    svg = client.get("/icon.svg")
+    assert svg.status_code == 200
+    assert svg.headers["content-type"].startswith("image/svg+xml")
