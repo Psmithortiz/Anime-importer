@@ -82,3 +82,79 @@ def test_cache_paths_come_from_the_environment(monkeypatch, tmp_path):
 
     assert settings.normalization_cache_dir == tmp_path / "norm"
     assert settings.details_cache_path == tmp_path / "details.json"
+
+
+def test_config_file_path_uses_the_override(monkeypatch, tmp_path):
+    from anime_importer.config import config_file_path
+
+    monkeypatch.setenv("ANIME_IMPORTER_CONFIG_FILE", str(tmp_path / "x.json"))
+
+    assert config_file_path() == tmp_path / "x.json"
+
+
+def test_config_file_path_defaults_to_the_user_config_dir(monkeypatch):
+    from platformdirs import user_config_path
+
+    from anime_importer.config import config_file_path
+
+    monkeypatch.delenv("ANIME_IMPORTER_CONFIG_FILE")
+
+    assert config_file_path() == user_config_path("anime-importer", appauthor=False) / "config.json"
+
+
+def test_missing_config_file_is_ignored():
+    settings = Settings(_env_file=None, demo=True)
+
+    assert settings.gemini_model == "gemini-2.5-flash"
+
+
+def test_config_file_with_keys_allows_creating_settings(tmp_path):
+    (tmp_path / "config.json").write_text('{"gemini_api_key": "g", "mal_client_id": "m"}')
+
+    settings = Settings(_env_file=None)
+
+    assert settings.gemini_api_key == "g"
+    assert settings.mal_client_id == "m"
+
+
+def test_config_file_value_is_used_when_nothing_overrides_it(tmp_path):
+    (tmp_path / "config.json").write_text('{"gemini_model": "from-file"}')
+
+    assert Settings(_env_file=None, demo=True).gemini_model == "from-file"
+
+
+def test_dotenv_overrides_the_config_file(tmp_path):
+    (tmp_path / "config.json").write_text('{"gemini_model": "from-file"}')
+    env_file = tmp_path / ".env"
+    env_file.write_text("GEMINI_MODEL=from-dotenv\n")
+
+    assert Settings(_env_file=env_file, demo=True).gemini_model == "from-dotenv"
+
+
+def test_environment_overrides_dotenv_and_the_config_file(monkeypatch, tmp_path):
+    (tmp_path / "config.json").write_text('{"gemini_model": "from-file"}')
+    env_file = tmp_path / ".env"
+    env_file.write_text("GEMINI_MODEL=from-dotenv\n")
+    monkeypatch.setenv("GEMINI_MODEL", "from-env")
+
+    assert Settings(_env_file=env_file, demo=True).gemini_model == "from-env"
+
+
+def test_invalid_json_names_the_file(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text("{not json")
+
+    with pytest.raises(ValueError, match="config.json"):
+        Settings(_env_file=None, demo=True)
+
+
+def test_non_object_json_names_the_file(tmp_path):
+    (tmp_path / "config.json").write_text("[1, 2]")
+
+    with pytest.raises(ValueError, match="config.json"):
+        Settings(_env_file=None, demo=True)
+
+
+def test_missing_keys_message_mentions_the_config_file():
+    with pytest.raises(ValidationError, match="config file"):
+        Settings(_env_file=None)
