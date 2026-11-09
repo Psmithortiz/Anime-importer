@@ -28,7 +28,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
       - name: Lint
-        run: uv run ruff check src tests
+        run: |
+          uv run ruff check src tests scripts
+          uv run ruff format --check src tests scripts
       - name: Test
         run: uv run pytest
   docker:
