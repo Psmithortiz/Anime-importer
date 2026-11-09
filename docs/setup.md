@@ -13,16 +13,51 @@ limits) come after.
 
 ## 1. Install
 
-| Option | Best for | You need | Demo without keys |
-| --- | --- | --- | --- |
-| [Windows app](#windows-app) | Using it on Windows | Nothing else | Yes |
-| [Docker](#docker) | macOS or Linux, or a quick look | Docker (Git only to build from source) | Yes |
-| [uvx](#uvx) | Running it without keeping a copy of the code | uv and Git | Yes |
-| [From source](#from-source) | Reading or changing the code | uv and Git | Yes |
+| Option | Best for | You need |
+| --- | --- | --- |
+| [Windows app](#windows-app) | Using it on Windows | Nothing else |
+| [Docker](#docker) | macOS or Linux, or a quick look | Docker (Git only to build from source) |
+| [uvx](#uvx) | Running it without keeping a copy of the code | uv and Git |
+| [From source](#from-source) | Reading or changing the code | uv and Git |
 
-**Demo mode** replays real Gemini and MyAnimeList responses recorded for a sample list. It needs no
-API keys and no internet access to those APIs. The sample list is preloaded on the start screen;
-titles outside it are not found. Every option below explains how to start it.
+### Normal mode and demo mode
+
+The app has two modes:
+
+- **Normal mode** uses your own API keys. The first time you open it, the **Settings** screen asks
+  for them (see [Get your API keys](#2-get-your-api-keys)).
+- **Demo mode** replays real Gemini and MyAnimeList responses recorded for a sample list. It needs no
+  API keys and no internet access to those APIs. Titles outside the sample list are not found.
+
+**Every option starts in normal mode; the demo is always asked for explicitly:** with `DEMO=1`, or
+with `AnimeImporter Demo.bat` in the Windows app.
+
+You can tell the demo by the notice at the top of the start screen ("Demo mode: recorded
+MyAnimeList and Gemini responses…"), the sample list already loaded in the text box, and the missing
+**Settings** link.
+
+The data is kept apart: the demo saves its sessions in `demo.db` and never reads or changes your
+keys, your sessions or your caches (see [Where files are stored](#where-files-are-stored)).
+
+| Option | Normal mode | Demo mode |
+| --- | --- | --- |
+| [Windows app](#windows-app) | Double-click `AnimeImporter.exe` | Double-click `AnimeImporter Demo.bat` |
+| [Docker, published image](#published-image-no-git-needed) | `docker run` with the image | The same, adding `-e DEMO=1` |
+| [Docker, Compose](#build-from-source-compose) | `docker compose up --build` | `DEMO=1 docker compose up --build` |
+| [uvx](#uvx) | `uvx --from git+… anime-importer-web` | The same, with `DEMO=1` before it |
+| [From source](#from-source) | `uv run anime-importer-web` | `DEMO=1 uv run anime-importer-web` |
+
+The commands above are for bash; each section has the full commands, with the PowerShell version.
+
+#### Switching modes
+
+- **Windows app** (and `anime-importer-app`): both modes can run at the same time. If the other mode
+  is already open, the new one starts on another port.
+- **The other options** use port 8000: stop the running one with `Ctrl+C` first, or start the second
+  one with another `PORT`.
+- **PowerShell:** `$env:DEMO="1"` stays set in that window until you close it, so a later command in
+  the same window also starts in demo mode. Open a new window, or run `Remove-Item Env:DEMO`. In
+  bash, `DEMO=1 command` only affects that command.
 
 ### Windows app
 
@@ -32,10 +67,16 @@ titles outside it are not found. Every option below explains how to start it.
 2. Scroll down to **Assets** (click it if it is collapsed) and download
    `AnimeImporter-vX.Y.Z-windows-x64.zip`. Do not download "Source code": it does not contain the app.
 3. Right-click the zip → **Extract All…** → **Extract**.
-4. Open the extracted folder and the `AnimeImporter` folder inside it, then double-click
-   `AnimeImporter.exe`.
+4. Open the extracted folder and the `AnimeImporter` folder inside it, then start it:
+
+   | | Double-click |
+   | --- | --- |
+   | Normal mode | `AnimeImporter.exe` |
+   | Demo mode | `AnimeImporter Demo.bat` (in the same folder) |
+
 5. If Windows shows **"Windows protected your PC"**, click **More info** → **Run anyway**. This appears
-   because the app is not signed with a paid certificate, not because something is wrong with it.
+   because the app is not signed with a paid certificate, not because something is wrong with it, and
+   it can also appear with the `.bat`.
    To check that the zip is the published one, see [Verify the download](#verify-the-download).
 
 A console window opens, and then the app opens in your browser. If the browser does not open, copy
@@ -45,15 +86,9 @@ the address shown in the console (usually <http://127.0.0.1:8000/>) into your br
 - **To stop it**, close the console window. Your sessions are saved; nothing is lost.
 - **Keep the `.exe` next to its `_internal` folder.** To move it, move the whole `AnimeImporter`
   folder. To launch it from the desktop, right-click the `.exe` → **Show more options** →
-  **Send to** → **Desktop (create shortcut)**.
-- **If you open it again while it is running**, it opens a new browser tab instead of a second copy.
-
-**Demo mode:** in the `AnimeImporter` folder, click the address bar of the File Explorer window, type
-`powershell` and press Enter. In the window that opens, run:
-
-```powershell
-$env:DEMO="1"; .\AnimeImporter.exe
-```
+  **Send to** → **Desktop (create shortcut)**. The `.bat` works the same way with a shortcut.
+- **If you open it again while it is running**, in the same mode it opens a new browser tab instead of
+  a second copy; in the other mode, see [Switching modes](#switching-modes).
 
 #### Verify the download
 
@@ -82,9 +117,11 @@ There are two ways: run the published image, or build it from the source with Co
 
 #### Published image (no Git needed)
 
-The image is `ghcr.io/psmithortiz/anime-importer` and exists since v0.2.0. Start it:
+The image is `ghcr.io/psmithortiz/anime-importer` and exists since v0.2.0.
 
-macOS / Linux (bash):
+**Start it:**
+
+Normal mode, macOS / Linux (bash):
 
 ```bash
 docker run --rm -p 127.0.0.1:8000:8000 \
@@ -93,7 +130,7 @@ docker run --rm -p 127.0.0.1:8000:8000 \
   ghcr.io/psmithortiz/anime-importer
 ```
 
-Windows (PowerShell):
+Normal mode, Windows (PowerShell):
 
 ```powershell
 docker run --rm -p 127.0.0.1:8000:8000 `
@@ -102,8 +139,26 @@ docker run --rm -p 127.0.0.1:8000:8000 `
   ghcr.io/psmithortiz/anime-importer
 ```
 
-Without `-e DEMO=1` it starts in real mode and asks for your keys in its Settings screen (see
-[Get your API keys](#2-get-your-api-keys)). Add `-e DEMO=1` to start the demo instead. Then open
+Demo mode, macOS / Linux (bash):
+
+```bash
+docker run --rm -e DEMO=1 -p 127.0.0.1:8000:8000 \
+  -v anime-importer-cache:/home/app/.cache \
+  -v anime-importer-data:/home/app/data \
+  ghcr.io/psmithortiz/anime-importer
+```
+
+Demo mode, Windows (PowerShell):
+
+```powershell
+docker run --rm -e DEMO=1 -p 127.0.0.1:8000:8000 `
+  -v anime-importer-cache:/home/app/.cache `
+  -v anime-importer-data:/home/app/data `
+  ghcr.io/psmithortiz/anime-importer
+```
+
+In normal mode the app asks for your keys in its Settings screen (see
+[Get your API keys](#2-get-your-api-keys)). When the log shows `Application startup complete`, open
 <http://127.0.0.1:8000> in your browser. Stop it with `Ctrl+C`.
 
 The named volumes keep your keys, sessions and caches between runs. They are different from the
@@ -129,15 +184,13 @@ docker pull ghcr.io/psmithortiz/anime-importer:latest
 
    | | macOS / Linux (bash) | Windows (PowerShell) |
    | --- | --- | --- |
-   | With your keys | `docker compose up --build` | `docker compose up --build` |
-   | Demo, no keys | `DEMO=1 docker compose up --build` | `$env:DEMO="1"; docker compose up --build` |
+   | Normal mode | `docker compose up --build` | `docker compose up --build` |
+   | Demo mode | `DEMO=1 docker compose up --build` | `$env:DEMO="1"; docker compose up --build` |
 
-   The first build takes a few minutes; later starts take seconds. When the log shows
-   `Application startup complete`, open <http://127.0.0.1:8000> in your browser. With your keys, the
-   app asks for them in its Settings screen (see [Get your API keys](#2-get-your-api-keys)).
-
-3. **Stop it** with `Ctrl+C` in that terminal, or run `docker compose down` from the same folder in
-   another terminal.
+   The first build takes a few minutes; later starts take seconds. In normal mode the app asks for
+   your keys in its Settings screen (see [Get your API keys](#2-get-your-api-keys)). When the log
+   shows `Application startup complete`, open <http://127.0.0.1:8000> in your browser. Stop it with
+   `Ctrl+C`, or run `docker compose down` from the same folder in another terminal.
 
 **Your data** lives in two Docker volumes and survives restarts and rebuilds:
 
@@ -164,11 +217,12 @@ Runs the app straight from GitHub without keeping a copy of the code.
 
 | | macOS / Linux (bash) | Windows (PowerShell) |
 | --- | --- | --- |
-| With your keys | `uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` | same command |
-| Demo, no keys | `DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` | `$env:DEMO="1"; uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` |
+| Normal mode | `uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` | same command |
+| Demo mode | `DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` | `$env:DEMO="1"; uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` |
 
-When the terminal shows `Application startup complete`, open <http://127.0.0.1:8000>. Stop it with
-`Ctrl+C`. It does not matter which folder you run it from: keys, sessions and caches are stored in
+In normal mode the app asks for your keys in its Settings screen (see
+[Get your API keys](#2-get-your-api-keys)). When the terminal shows `Application startup complete`,
+open <http://127.0.0.1:8000> in your browser. Stop it with `Ctrl+C`. It does not matter which folder you run it from: keys, sessions and caches are stored in
 your user folders.
 
 To get the latest version, add `--refresh` after `uvx`.
@@ -192,12 +246,23 @@ Then, from that folder:
 | `uv run anime-importer-app` | Same as the Windows app: picks a free port and opens your browser. |
 | `uv run anime-importer` | The [command line](#4-command-line) version. |
 
-For demo mode, put `DEMO=1 ` before the command (bash) or run `$env:DEMO="1"` first (PowerShell).
+**Start it** (the web app):
+
+| | macOS / Linux (bash) | Windows (PowerShell) |
+| --- | --- | --- |
+| Normal mode | `uv run anime-importer-web` | same command |
+| Demo mode | `DEMO=1 uv run anime-importer-web` | `$env:DEMO="1"; uv run anime-importer-web` |
+
+`anime-importer-app` and `anime-importer` accept `DEMO=1` the same way. In normal mode the app asks
+for your keys in its Settings screen (see [Get your API keys](#2-get-your-api-keys)). When the
+terminal shows `Application startup complete`, open <http://127.0.0.1:8000> in your browser. Stop it
+with `Ctrl+C`.
+
 To update, run `git pull` and `uv sync`.
 
 ## 2. Get your API keys
 
-Skip this section for demo mode.
+Skip this section for [demo mode](#normal-mode-and-demo-mode).
 
 The app needs two free keys. The first time you open it without them, it shows a **Settings** screen
 with a field for each key and a link to where you get it.
@@ -415,6 +480,6 @@ spend Gemini quota again), move the contents of `.cache/normalization` and the f
 
 ### Known limitations
 
-- The Windows app (and `anime-importer-app`) only detects an already running copy on port 8000. If
-  another program uses 8000, every launch opens a new copy on a free port. SQLite in WAL mode
-  prevents corruption, but it is best to use a single window.
+- The Windows app (and `anime-importer-app`) only detects an already running copy of the same mode
+  on port 8000. If another program uses 8000, every launch opens a new copy on a free port. SQLite
+  in WAL mode prevents corruption, but it is best to use a single window per mode.
