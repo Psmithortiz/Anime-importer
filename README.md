@@ -216,8 +216,9 @@ With [uv](https://docs.astral.sh/uv/) installed, you can run the web UI straight
 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
 ```
 
-Run it from a folder that contains your `.env` file (see below): settings are read from the
-current directory, and the normalization cache is created there too.
+Run it from a folder that contains your `.env` file (see below), or put your keys in the per-user
+config file (see "Where files are stored"). Caches and sessions live in per-user folders, not in the
+current directory.
 
 ### From source
 
@@ -234,8 +235,29 @@ GEMINI_API_KEY=your_gemini_key        # from Google AI Studio
 MAL_CLIENT_ID=your_mal_client_id      # from https://myanimelist.net/apiconfig
 ```
 
-Optional settings: `GEMINI_MODEL`, `GEMINI_CHUNK_SIZE` (default 20), `NORMALIZATION_CACHE_DIR`
-(default `.cache/normalization`) and `DATABASE_PATH` (see below).
+Optional settings: `GEMINI_MODEL` and `GEMINI_CHUNK_SIZE` (default 20). The paths of the caches,
+sessions and config file are described below.
+
+### Where files are stored
+
+Caches, sessions and settings live in per-user folders, never in the current folder:
+
+| What | Default location (Windows / Linux / macOS) | Variable to change it |
+| --- | --- | --- |
+| Normalization cache | `%LOCALAPPDATA%\anime-importer\Cache\normalization` / `~/.cache/anime-importer/normalization` / `~/Library/Caches/anime-importer/normalization` | `NORMALIZATION_CACHE_DIR` |
+| MAL details cache | `mal_details.json` in the same cache folder | `DETAILS_CACHE_PATH` |
+| Sessions | see below | `DATABASE_PATH` (`DEMO_DATABASE_PATH` in demo mode) |
+| Config file | `%LOCALAPPDATA%\anime-importer\config.json` / `~/.config/anime-importer/config.json` / `~/Library/Application Support/anime-importer/config.json` | `ANIME_IMPORTER_CONFIG_FILE` |
+
+Settings are read in this order of priority (highest first): environment variables, `.env`, the
+config file (a JSON object such as `{"gemini_api_key": "...", "mal_client_id": "..."}`), and the
+defaults. A missing config file is ignored; an invalid one stops the app with an error naming it.
+Computing these paths creates nothing: folders are created when something is first written.
+
+**Upgrading from an earlier version.** Caches used to live in `.cache/` inside the folder where the
+app was run. To keep them (and not spend Gemini quota again), move the contents of
+`.cache/normalization` and the file `.cache/mal_details.json` to the new cache folder. Nothing is
+migrated automatically.
 
 ### Where sessions are stored
 
