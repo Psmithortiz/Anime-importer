@@ -627,6 +627,7 @@ function goToStart() {
   history.replaceState(null, "", location.pathname + location.search);
   $("start-error").hidden = true;
   $("poll-warning").hidden = true;
+  $("file-name").textContent = "";
   updateLineCount();
   showScreen("start");
   loadRecent();
@@ -855,6 +856,7 @@ async function init() {
   $("titles-input").addEventListener("input", updateLineCount);
   $("file-input").addEventListener("change", (event) => {
     const file = event.target.files[0];
+    $("file-name").textContent = file ? file.name : "";
     if (file) readFileInto(file);
     event.target.value = "";
   });

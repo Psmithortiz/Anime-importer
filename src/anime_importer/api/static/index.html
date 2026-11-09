@@ -21,7 +21,9 @@
         <p class="muted">Paste your anime list (one title per line) or load a .txt file.</p>
         <textarea id="titles-input" rows="14" placeholder="Naruto&#10;Hellsing&#10;..."></textarea>
         <div class="row">
-          <input id="file-input" type="file" accept=".txt,text/plain" />
+          <input id="file-input" class="visually-hidden" type="file" accept=".txt,text/plain" />
+          <label for="file-input" class="button">Load .txt file</label>
+          <span id="file-name" class="muted"></span>
           <span id="line-count" class="muted">0 titles</span>
         </div>
         <p id="start-error" class="error" hidden></p>
