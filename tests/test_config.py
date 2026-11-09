@@ -1,5 +1,4 @@
 import pytest
-from pydantic import ValidationError
 
 from anime_importer.config import Settings
 
@@ -11,23 +10,20 @@ def test_demo_without_keys_is_valid():
     assert settings.mal_client_id is None
 
 
-def test_without_keys_and_without_demo_names_the_missing_ones():
-    with pytest.raises(ValidationError) as excinfo:
-        Settings(_env_file=None, demo=False)
+def test_missing_keys_names_the_missing_ones():
+    settings = Settings(_env_file=None, demo=False)
 
-    message = str(excinfo.value)
-    assert "GEMINI_API_KEY" in message
-    assert "MAL_CLIENT_ID" in message
-    assert "DEMO=1" in message
+    assert settings.missing_keys() == ["GEMINI_API_KEY", "MAL_CLIENT_ID"]
 
 
 def test_only_the_missing_key_is_named():
-    with pytest.raises(ValidationError) as excinfo:
-        Settings(_env_file=None, gemini_api_key="k")
+    settings = Settings(_env_file=None, gemini_api_key="k")
 
-    message = str(excinfo.value)
-    assert "MAL_CLIENT_ID" in message
-    assert "GEMINI_API_KEY" not in message
+    assert settings.missing_keys() == ["MAL_CLIENT_ID"]
+
+
+def test_missing_keys_is_empty_in_demo_mode():
+    assert Settings(_env_file=None, demo=True).missing_keys() == []
 
 
 def test_with_keys_is_valid():
@@ -155,6 +151,45 @@ def test_non_object_json_names_the_file(tmp_path):
         Settings(_env_file=None, demo=True)
 
 
-def test_missing_keys_message_mentions_the_config_file():
-    with pytest.raises(ValidationError, match="config file"):
-        Settings(_env_file=None)
+def _status(settings, tmp_path):
+    from anime_importer.config import key_status
+
+    return {s.name: s for s in key_status(settings, tmp_path / ".env", tmp_path / "config.json")}
+
+
+def test_key_status_missing(tmp_path):
+    from anime_importer.config import KeySource
+
+    statuses = _status(Settings(_env_file=None), tmp_path)
+
+    assert statuses["GEMINI_API_KEY"].source is KeySource.MISSING
+    assert statuses["GEMINI_API_KEY"].masked is None
+
+
+def test_key_status_sources_and_priority(monkeypatch, tmp_path):
+    from anime_importer.config import KeySource
+
+    (tmp_path / "config.json").write_text(
+        '{"gemini_api_key": "file-key-1234", "mal_client_id": "file-mal-5678"}'
+    )
+    (tmp_path / ".env").write_text("GEMINI_API_KEY=dotenv-key-9999\n")
+    settings = Settings(_env_file=tmp_path / ".env")
+    statuses = _status(settings, tmp_path)
+    assert statuses["GEMINI_API_KEY"].source is KeySource.DOTENV
+    assert statuses["MAL_CLIENT_ID"].source is KeySource.CONFIG_FILE
+
+    monkeypatch.setenv("GEMINI_API_KEY", "env-key-0000")
+    statuses = _status(Settings(_env_file=tmp_path / ".env"), tmp_path)
+    assert statuses["GEMINI_API_KEY"].source is KeySource.ENVIRONMENT
+    assert statuses["GEMINI_API_KEY"].masked == "••••0000"
+
+
+def test_masked_never_shows_more_than_the_last_four(tmp_path):
+    from anime_importer.config import mask_key
+
+    assert mask_key("abcdefghijkl") == "••••ijkl"
+    assert mask_key("abcdefgh") == "••••"
+    assert mask_key("abc") == "••••"
+    settings = Settings(_env_file=None, gemini_api_key="supersecretkey", mal_client_id="m")
+    for status in _status(settings, tmp_path).values():
+        assert "supersecret" not in (status.masked or "")

@@ -1,16 +1,19 @@
-import json
 import os
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Self
 
+from dotenv import dotenv_values
 from platformdirs import user_cache_path, user_config_path, user_data_path
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_settings import (
     BaseSettings,
     JsonConfigSettingsSource,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
+from anime_importer.adapters.config_file import read_config
 
 
 def _data_dir() -> Path:
@@ -29,19 +32,6 @@ def config_file_path() -> Path:
     if override:
         return Path(override)
     return user_config_path("anime-importer", appauthor=False) / "config.json"
-
-
-def _check_config_file(path: Path) -> None:
-    """Fail with a message naming the file if it exists but is not a JSON object."""
-    if not path.is_file():
-        return
-    try:
-        content = path.read_text(encoding="utf-8")
-        data = json.loads(content) if content.strip() else {}
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"Cannot read the config file {path}: {exc}") from exc
-    if not isinstance(data, dict):
-        raise ValueError(f"The config file {path} must contain a JSON object.")  # noqa: TRY004
 
 
 class Settings(BaseSettings):
@@ -79,7 +69,7 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         path = config_file_path()
-        _check_config_file(path)
+        read_config(path)  # fail early with a clear message
         return (
             init_settings,
             env_settings,
@@ -88,21 +78,63 @@ class Settings(BaseSettings):
             file_secret_settings,
         )
 
-    @model_validator(mode="after")
-    def _require_keys_unless_demo(self) -> Self:
+    def missing_keys(self) -> list[str]:
+        """Names of the required API keys that are not set. Always empty in demo mode."""
         if self.demo:
-            return self
-        missing = [
-            name
-            for name, value in (
-                ("GEMINI_API_KEY", self.gemini_api_key),
-                ("MAL_CLIENT_ID", self.mal_client_id),
-            )
-            if not value
-        ]
-        if missing:
-            raise ValueError(
-                f"Missing required settings: {', '.join(missing)}. "
-                "Set them in the environment, in .env or in the config file, or use DEMO=1 to try the app without keys."
-            )
-        return self
+            return []
+        return [name for name, value in self._keys() if not value]
+
+    def _keys(self) -> tuple[tuple[str, str | None], ...]:
+        return (
+            ("GEMINI_API_KEY", self.gemini_api_key),
+            ("MAL_CLIENT_ID", self.mal_client_id),
+        )
+
+
+class KeySource(StrEnum):
+    ENVIRONMENT = "environment"
+    DOTENV = "dotenv"
+    CONFIG_FILE = "config_file"
+    MISSING = "missing"
+
+
+@dataclass(frozen=True, slots=True)
+class KeyStatus:
+    name: str
+    source: KeySource
+    masked: str | None
+
+
+def mask_key(value: str) -> str:
+    """Hide a key, showing at most its last 4 characters (nothing if it has 8 or fewer)."""
+    return "••••" + (value[-4:] if len(value) > 8 else "")
+
+
+def key_status(
+    settings: Settings,
+    env_file: str | Path = ".env",
+    config_path: Path | None = None,
+) -> list[KeyStatus]:
+    """Where each API key comes from, in priority order: environment, .env, config file.
+
+    Never returns a full key.
+    """
+    dotenv = dotenv_values(env_file)
+    try:
+        in_file = read_config(config_path or config_file_path())
+    except ValueError:
+        in_file = {}
+    result = []
+    for name, value in settings._keys():
+        if not value:
+            result.append(KeyStatus(name, KeySource.MISSING, None))
+        elif os.environ.get(name):
+            result.append(KeyStatus(name, KeySource.ENVIRONMENT, mask_key(value)))
+        elif dotenv.get(name):
+            result.append(KeyStatus(name, KeySource.DOTENV, mask_key(value)))
+        elif in_file.get(name.lower()):
+            result.append(KeyStatus(name, KeySource.CONFIG_FILE, mask_key(value)))
+        else:
+            # Passed in code (e.g. Settings(gemini_api_key=...)): treat it as not editable.
+            result.append(KeyStatus(name, KeySource.ENVIRONMENT, mask_key(value)))
+    return result

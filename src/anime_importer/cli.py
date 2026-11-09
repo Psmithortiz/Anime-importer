@@ -15,6 +15,11 @@ from anime_importer.services.import_session import ImportSession
 
 logger = logging.getLogger(__name__)
 
+MISSING_KEYS_MESSAGE = (
+    "Missing required settings: %s. Set them as environment variables, in a .env file in the "
+    "current folder, or in the config file (run the web app and use its Settings screen)."
+)
+
 
 def describe_question(step: NormalizationChoice | CandidateChoice) -> str:
     lines = ["", "-" * 50]
@@ -63,6 +68,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     settings = Settings()
+    missing = settings.missing_keys()
+    if missing:
+        logger.error(MISSING_KEYS_MESSAGE, ", ".join(missing))
+        return 2
     input_path = args.input or settings.input_path
     output_path = args.output or settings.output_xml_path
     rejected_path = args.rejected or settings.rejected_report_path
