@@ -7,7 +7,7 @@ from anime_importer.config import Settings
 
 
 def test_database_paths_default_to_the_user_data_dir():
-    settings = Settings(_env_file=None, demo=True)
+    settings = Settings(demo=True)
 
     folder = user_data_path("anime-importer", appauthor=False)
     assert settings.database_path == folder / "sessions.db"
@@ -17,7 +17,7 @@ def test_database_paths_default_to_the_user_data_dir():
 def test_computing_the_default_database_paths_creates_no_folders(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "_data_dir", lambda: tmp_path / "data")
 
-    settings = Settings(_env_file=None, demo=True)
+    settings = Settings(demo=True)
 
     assert settings.database_path == tmp_path / "data" / "sessions.db"
     assert not (tmp_path / "data").exists()
@@ -27,7 +27,7 @@ def test_database_path_comes_from_the_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "mine.db"))
     monkeypatch.setenv("DEMO_DATABASE_PATH", str(tmp_path / "mine-demo.db"))
 
-    settings = Settings(_env_file=None, demo=True)
+    settings = Settings(demo=True)
 
     assert settings.database_path == tmp_path / "mine.db"
     assert settings.demo_database_path == tmp_path / "mine-demo.db"

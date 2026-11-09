@@ -207,19 +207,15 @@ class FileConfigurator:
             raise InvalidStateError("Demo mode does not use API keys")
         with self._lock:
             locked = {
-                k.name.lower(): k.source
+                k.name.lower()
                 for k in key_status(Settings(), config_path=self._config_path)
-                if k.source in (KeySource.ENVIRONMENT, KeySource.DOTENV)
+                if k.source is KeySource.ENVIRONMENT
             }
             for field in updates:
-                source = locked.get(field)
-                if source is not None:
-                    where = (
-                        "an environment variable"
-                        if source is KeySource.ENVIRONMENT
-                        else "the .env file"
+                if field in locked:
+                    raise InvalidStateError(
+                        f"{field.upper()} is set by an environment variable; change it there"
                     )
-                    raise InvalidStateError(f"{field.upper()} is set by {where}; change it there")
             save_config(self._config_path, updates)
             new_settings = Settings()
             if not self._configured:

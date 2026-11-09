@@ -17,7 +17,6 @@ class RecordingDetails:
 def settings(tmp_path):
     RecordingDetails.created = 0
     return Settings(
-        _env_file=None,
         gemini_api_key="k",
         mal_client_id="m",
         normalization_cache_dir=tmp_path / "norm",
@@ -75,7 +74,7 @@ def test_demo_session_needs_no_keys_nor_real_adapters(monkeypatch, tmp_path):
     monkeypatch.setattr(bootstrap, "CachingNormalizer", forbidden)
     monkeypatch.setattr(bootstrap, "CachingDetailsProvider", forbidden)
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
-    settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path, demo_delay_seconds=0)
+    settings = Settings(demo=True, demo_data_dir=tmp_path, demo_delay_seconds=0)
 
     services = bootstrap.build_services(settings, InMemorySessionRepository())
 
@@ -84,7 +83,7 @@ def test_demo_session_needs_no_keys_nor_real_adapters(monkeypatch, tmp_path):
 
 def test_demo_session_without_franchise_has_no_finder(tmp_path):
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
-    settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path)
+    settings = Settings(demo=True, demo_data_dir=tmp_path)
 
     services = bootstrap.build_services(settings, InMemorySessionRepository(), with_franchise=False)
 
@@ -93,7 +92,7 @@ def test_demo_session_without_franchise_has_no_finder(tmp_path):
 
 def test_two_sessions_of_the_same_services_share_the_adapters(tmp_path):
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
-    settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path, demo_delay_seconds=0)
+    settings = Settings(demo=True, demo_data_dir=tmp_path, demo_delay_seconds=0)
     services = bootstrap.build_services(settings, InMemorySessionRepository())
 
     first = services.new_session("one", ["a"])
@@ -107,7 +106,7 @@ def test_two_sessions_of_the_same_services_share_the_adapters(tmp_path):
 
 def test_restore_session_returns_none_for_unknown_ids(tmp_path):
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
-    settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path)
+    settings = Settings(demo=True, demo_data_dir=tmp_path)
     services = bootstrap.build_services(settings, InMemorySessionRepository())
     services.new_session("known", ["a"])
 
@@ -121,7 +120,7 @@ def test_session_services_can_back_a_registry(tmp_path):
     from anime_importer.api.registry import SessionRegistry
 
     (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
-    settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path)
+    settings = Settings(demo=True, demo_data_dir=tmp_path)
     services = bootstrap.build_services(settings, InMemorySessionRepository())
     registry = SessionRegistry(services, run_in_background=lambda fn: None)
 

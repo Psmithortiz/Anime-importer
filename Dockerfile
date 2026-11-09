@@ -25,7 +25,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     HOST=0.0.0.0 \
     DATABASE_PATH=/home/app/data/sessions.db \
-    DEMO_DATABASE_PATH=/home/app/data/demo.db
+    DEMO_DATABASE_PATH=/home/app/data/demo.db \
+    ANIME_IMPORTER_CONFIG_FILE=/home/app/data/config.json
 USER app
 WORKDIR /home/app
 EXPOSE 8000

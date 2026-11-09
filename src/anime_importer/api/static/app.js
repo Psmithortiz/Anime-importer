@@ -720,13 +720,13 @@ const KEY_LABELS = {
 
 const SOURCE_TEXT = {
   environment: "Set by an environment variable",
-  dotenv: "Set in the .env file",
   config_file: "saved in the config file",
   missing: "Not set",
 };
 
 // Inputs of the settings screen: API field name -> input element.
 const settingsInputs = new Map();
+let settingsAllLocked = false;
 
 function renderSettings(config) {
   const container = $("settings-keys");
@@ -735,7 +735,7 @@ function renderSettings(config) {
   for (const key of config.keys) {
     const meta = KEY_LABELS[key.name];
     if (!meta) continue;
-    const locked = key.source === "environment" || key.source === "dotenv";
+    const locked = key.source === "environment";
     const inputId = `settings-${meta.field}`;
     const input = el("input", {
       attrs: { id: inputId, type: "password", autocomplete: "off", spellcheck: "false" },
@@ -761,7 +761,13 @@ function renderSettings(config) {
       ]),
     );
   }
-  $("settings-save-btn").hidden = [...settingsInputs.values()].every((input) => input.disabled);
+  settingsAllLocked = [...settingsInputs.values()].every((input) => input.disabled);
+  $("settings-save-btn").disabled = settingsAllLocked;
+  $("settings-intro").textContent = settingsAllLocked
+    ? "Your keys are set by environment variables."
+    : configured
+      ? "API keys used to talk to Gemini and MyAnimeList."
+      : "Enter your API keys to start. They are saved in a config file in your user folder.";
 }
 
 function setSettingsMessage(text) {
@@ -773,9 +779,6 @@ async function openSettings() {
   stopPolling();
   $("settings-error").hidden = true;
   setSettingsMessage("");
-  $("settings-intro").textContent = configured
-    ? "API keys used to talk to Gemini and MyAnimeList."
-    : "Enter your API keys to start. They are saved in a config file in your user folder.";
   $("settings-back-btn").hidden = !configured;
   try {
     renderSettings(await api("GET", "/api/config"));
@@ -818,23 +821,13 @@ async function saveSettings() {
     $("settings-error").hidden = false;
   } finally {
     busy = false;
-    $("settings-save-btn").disabled = false;
+    $("settings-save-btn").disabled = settingsAllLocked;
   }
 }
 
-// The Settings link is useless in demo mode and when every key is fixed by the environment.
-async function refreshSettingsLink(info) {
-  settingsLinkAvailable = false;
-  updateSettingsLink();
-  if (info.demo) return;
-  let config;
-  try {
-    config = await api("GET", "/api/config");
-  } catch {
-    return; // Without the endpoint there is nothing to configure.
-  }
-  const editable = config.keys.some((key) => key.source !== "environment" && key.source !== "dotenv");
-  settingsLinkAvailable = editable;
+// The Settings link is shown everywhere except in demo mode (and on the settings screen itself).
+function refreshSettingsLink(info) {
+  settingsLinkAvailable = !info.demo;
   updateSettingsLink();
 }
 
@@ -847,7 +840,7 @@ async function loadInfo() {
     return null;
   }
   configured = info.configured !== false;
-  await refreshSettingsLink(info);
+  refreshSettingsLink(info);
   if (!info.demo) return info;
   $("demo-banner").textContent = DEMO_NOTICE;
   $("demo-banner").hidden = false;

@@ -29,7 +29,7 @@ class _Searcher:
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    """No keys anywhere, no .env in the current folder, fake services instead of real adapters."""
+    """No keys anywhere, fake services instead of real adapters."""
     monkeypatch.chdir(tmp_path)
     for name in ("GEMINI_API_KEY", "MAL_CLIENT_ID", "DEMO"):
         monkeypatch.delenv(name, raising=False)
@@ -110,16 +110,6 @@ def test_key_from_the_environment_cannot_be_changed(env, monkeypatch):
     assert response.status_code == 409
     assert "environment variable" in response.json()["detail"]
     assert not path.exists()
-
-
-def test_key_from_dotenv_cannot_be_changed(env):
-    (env / ".env").write_text("MAL_CLIENT_ID=dotenv-mal-1111\n")
-    client, _ = _app(env)
-
-    response = client.put("/api/config", json={"mal_client_id": MAL})
-
-    assert response.status_code == 409
-    assert ".env" in response.json()["detail"]
 
 
 def test_saving_in_demo_mode_is_rejected(env, monkeypatch):
