@@ -191,6 +191,16 @@ class ImportSession:
         return self._normalization_progress
 
     @property
+    def is_resolving(self) -> bool:
+        """Whether the background worker is still resolving titles."""
+        with self._cond:
+            return (
+                self._worker_started
+                and len(self._resolutions) < len(self._titles)
+                and self._worker_error is None
+            )
+
+    @property
     def resolution_progress(self) -> tuple[int, int] | None:
         """(titles looked up on MAL, total), or None until the worker has been launched."""
         with self._cond:

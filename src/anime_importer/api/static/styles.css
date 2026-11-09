@@ -390,20 +390,30 @@ button:disabled {
 
 .recent-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  cursor: pointer;
+  gap: 0.5rem;
+  align-items: stretch;
 }
 
-.recent-item:hover,
-.recent-item:focus-visible {
-  background: var(--surface-hover);
+.recent-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.recent-open:hover,
+.recent-open:focus-visible {
   border-color: var(--accent);
-  outline: none;
+}
+
+.recent-delete {
+  align-self: center;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 .recent-titles {

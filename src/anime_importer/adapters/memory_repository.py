@@ -84,6 +84,10 @@ class InMemorySessionRepository:
             record.updated_at = self._clock()
             return True
 
+    def delete(self, session_id: str) -> bool:
+        with self._lock:
+            return self._records.pop(session_id, None) is not None
+
     def load(self, session_id: str) -> StoredSession | None:
         with self._lock:
             record = self._records.get(session_id)

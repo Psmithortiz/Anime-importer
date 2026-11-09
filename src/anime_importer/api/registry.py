@@ -36,6 +36,8 @@ class SessionProvider(Protocol):
 
     def list_recent(self, limit: int) -> list[SessionSummary]: ...
 
+    def delete_session(self, session_id: str) -> bool: ...
+
 
 class SessionNotFoundError(Exception):
     """No session exists with that id."""
@@ -56,6 +58,7 @@ class ManagedSession:
     status: SessionStatus = "preparing"
     error: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
+    deleted: bool = False
 
     def run_start(self) -> None:
         """Runs in the background. Must never leave the status at "preparing"."""
@@ -93,6 +96,8 @@ class ManagedSession:
 
     def undo(self) -> None:
         with self.lock:
+            if self.deleted:
+                raise SessionNotFoundError(self.id)
             if self.status not in ("question", "finished"):
                 raise InvalidStateError(f"Operation not valid in state '{self.status}'")
             try:
@@ -170,6 +175,8 @@ class ManagedSession:
         self.status = "finished" if isinstance(step, Finished) else "question"
 
     def _require(self, expected: SessionStatus) -> None:
+        if self.deleted:
+            raise SessionNotFoundError(self.id)
         if self.status != expected:
             raise InvalidStateError(f"Operation not valid in state '{self.status}'")
 
@@ -225,6 +232,36 @@ class SessionRegistry:
 
     def list_recent(self, limit: int) -> list[SessionSummary]:
         return self._services.list_recent(limit)
+
+    def delete(self, session_id: str) -> None:
+        """Delete a session that is not busy. Raises SessionNotFoundError or InvalidStateError.
+
+        Lock order: a ManagedSession lock may be taken BEFORE the registry lock, never after.
+        """
+        with self._lock:
+            managed = self._sessions.get(session_id)
+            if managed is None:
+                # Under the registry lock, so get() cannot load it meanwhile. A local SQLite
+                # delete is fast enough to hold the lock.
+                if not self._services.delete_session(session_id):
+                    raise SessionNotFoundError(session_id)
+                return
+        # run_start holds this lock for minutes: do not wait for it, a busy session is a 409.
+        if not managed.lock.acquire(blocking=False):
+            raise InvalidStateError("The session is busy; try again when it is ready")
+        try:
+            if managed.status == "preparing" or managed.session.is_resolving:
+                raise InvalidStateError(
+                    "The session is still looking up titles; delete it when that finishes"
+                )
+            if not self._services.delete_session(session_id):
+                raise SessionNotFoundError(session_id)
+            managed.deleted = True
+            with self._lock:
+                if self._sessions.get(session_id) is managed:
+                    del self._sessions[session_id]
+        finally:
+            managed.lock.release()
 
     def _load(self, session_id: str) -> ManagedSession:
         session = self._services.restore_session(session_id)

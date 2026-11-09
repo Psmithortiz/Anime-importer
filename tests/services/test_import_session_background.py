@@ -149,3 +149,42 @@ def test_real_thread_start_does_not_wait_for_the_whole_list():
     assert not runner.is_alive()
     assert isinstance(finisher[0], Finished)
     assert session.resolution_progress == (4, 4)
+
+
+def test_is_resolving_is_false_before_start():
+    session = make_session(["A", "B"], Normalizer(), CountingSearcher({}), run_in_background=sync)
+
+    assert session.is_resolving is False
+
+
+def test_is_resolving_while_resolutions_are_missing():
+    launched: list = []
+    session = make_session(
+        ["A", "B"], Normalizer(), CountingSearcher({}), run_in_background=launched.append
+    )
+    done = threading.Thread(target=session.start, daemon=True)
+    done.start()
+    done.join(0.2)  # start() waits for the worker, which has only been "launched", not run
+
+    assert session.is_resolving is True
+
+    launched[0]()  # the worker runs to completion
+    done.join(TIMEOUT)
+
+    assert session.is_resolving is False
+
+
+def test_is_resolving_is_false_when_the_worker_finished():
+    session = make_session(["A", "B"], Normalizer(), CountingSearcher({}), run_in_background=sync)
+
+    session.start()
+
+    assert session.is_resolving is False
+
+
+def test_is_resolving_is_false_when_the_worker_died():
+    session = make_session(["A", "B"], Normalizer(), ExplodingSearcher(), run_in_background=sync)
+    with pytest.raises(ResolutionError):
+        session.start()
+
+    assert session.is_resolving is False
