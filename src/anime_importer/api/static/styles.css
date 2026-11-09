@@ -541,3 +541,33 @@ th {
     align-items: stretch;
   }
 }
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 1.5rem;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.key-field {
+  margin: 1rem 0;
+}
+
+.key-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.key-field input {
+  width: 100%;
+  box-sizing: border-box;
+}

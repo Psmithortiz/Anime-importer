@@ -5,7 +5,7 @@
 
 const POLL_INTERVAL_MS = 2000;
 
-const SCREENS = ["start", "preparing", "question", "finished", "failed"];
+const SCREENS = ["start", "preparing", "question", "finished", "failed", "settings"];
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,6 +13,7 @@ let sessionId = null;
 let currentView = null;
 let pollTimer = null;
 let busy = false;
+let configured = true;
 // Multi-selection of the current question: MAL id -> list status.
 const selection = new Map();
 // Single selection of a normalization question: option number, or null.
@@ -694,18 +695,148 @@ const DEMO_NOTICE =
   "Demo mode: recorded MyAnimeList and Gemini responses, no API keys needed. " +
   "Titles outside the sample list won't be found.";
 
+const KEY_LABELS = {
+  GEMINI_API_KEY: {
+    label: "Gemini API key",
+    url: "https://aistudio.google.com/apikey",
+    field: "gemini_api_key",
+  },
+  MAL_CLIENT_ID: {
+    label: "MAL client ID",
+    url: "https://myanimelist.net/apiconfig",
+    field: "mal_client_id",
+  },
+};
+
+const SOURCE_TEXT = {
+  environment: "Set by an environment variable",
+  dotenv: "Set in the .env file",
+  config_file: "Saved in the config file",
+  missing: "Not set",
+};
+
+// Inputs of the settings screen: API field name -> input element.
+const settingsInputs = new Map();
+
+function renderSettings(config) {
+  const container = $("settings-keys");
+  container.replaceChildren();
+  settingsInputs.clear();
+  for (const key of config.keys) {
+    const meta = KEY_LABELS[key.name];
+    if (!meta) continue;
+    const locked = key.source === "environment" || key.source === "dotenv";
+    const inputId = `settings-${meta.field}`;
+    const input = el("input", {
+      attrs: { id: inputId, type: "password", autocomplete: "off", spellcheck: "false" },
+    });
+    input.disabled = locked;
+    settingsInputs.set(meta.field, input);
+    const current = key.masked ? `${SOURCE_TEXT[key.source]} (${key.masked})` : SOURCE_TEXT[key.source];
+    const link = el("a", {
+      text: "Get one",
+      className: "small-link",
+      attrs: { href: meta.url, target: "_blank", rel: "noopener noreferrer" },
+    });
+    container.append(
+      el("div", { className: "key-field" }, [
+        el("label", { text: meta.label, attrs: { for: inputId } }),
+        input,
+        el("p", { text: current, className: "muted small" }),
+        link,
+      ]),
+    );
+  }
+  $("settings-save-btn").hidden = [...settingsInputs.values()].every((input) => input.disabled);
+}
+
+function setSettingsMessage(text) {
+  $("settings-message").textContent = text || "";
+  $("settings-message").hidden = !text;
+}
+
+async function openSettings() {
+  stopPolling();
+  $("settings-error").hidden = true;
+  setSettingsMessage("");
+  $("settings-intro").textContent = configured
+    ? "API keys used to talk to Gemini and MyAnimeList."
+    : "Enter your API keys to start. They are saved in a config file in your user folder.";
+  $("settings-back-btn").hidden = !configured;
+  try {
+    renderSettings(await api("GET", "/api/config"));
+  } catch (error) {
+    $("settings-error").textContent = error.message;
+    $("settings-error").hidden = false;
+  }
+  showScreen("settings");
+}
+
+async function saveSettings() {
+  if (busy) return;
+  const updates = {};
+  for (const [field, input] of settingsInputs) {
+    const value = input.value.trim();
+    if (value !== "") updates[field] = value;
+  }
+  $("settings-error").hidden = true;
+  if (Object.keys(updates).length === 0) {
+    $("settings-error").textContent = "Enter at least one key.";
+    $("settings-error").hidden = false;
+    return;
+  }
+  busy = true;
+  $("settings-save-btn").disabled = true;
+  try {
+    const config = await api("PUT", "/api/config", updates);
+    for (const input of settingsInputs.values()) input.value = ""; // keys must not stay in the DOM
+    configured = config.configured;
+    renderSettings(config);
+    if (config.restart_required) {
+      setSettingsMessage("Saved. Restart the app to use the new keys.");
+    } else if (config.configured) {
+      goToStart();
+    } else {
+      setSettingsMessage("Saved. Enter the remaining key to continue.");
+    }
+  } catch (error) {
+    $("settings-error").textContent = error.message;
+    $("settings-error").hidden = false;
+  } finally {
+    busy = false;
+    $("settings-save-btn").disabled = false;
+  }
+}
+
+// The Settings link is useless in demo mode and when every key is fixed by the environment.
+async function refreshSettingsLink(info) {
+  $("settings-link").hidden = true;
+  if (info.demo) return;
+  try {
+    const config = await api("GET", "/api/config");
+    const editable = config.keys.some((key) => key.source !== "environment" && key.source !== "dotenv");
+    $("settings-link").hidden = !editable;
+  } catch {
+    // Without the endpoint there is nothing to configure.
+  }
+}
+
 async function loadInfo() {
   try {
     const info = await api("GET", "/api/info");
-    if (!info.demo) return;
+    configured = info.configured !== false;
+    await refreshSettingsLink(info);
+    if (!info.demo) return info;
     $("demo-banner").textContent = DEMO_NOTICE;
     $("demo-banner").hidden = false;
     if (info.sample_text && $("titles-input").value.trim() === "") {
       $("titles-input").value = info.sample_text;
       updateLineCount();
     }
+    return info;
   } catch {
     // The info endpoint is optional: without it the app behaves as in normal mode.
+    return null;
   }
 }
 
@@ -727,7 +858,15 @@ async function init() {
   }
   document.addEventListener("keydown", onKeydown);
 
-  await loadInfo();
+  $("settings-link").addEventListener("click", openSettings);
+  $("settings-save-btn").addEventListener("click", saveSettings);
+  $("settings-back-btn").addEventListener("click", goToStart);
+
+  const info = await loadInfo();
+  if (info && !info.demo && !info.configured) {
+    await openSettings();
+    return;
+  }
 
   const id = decodeURIComponent(location.hash.slice(1));
   if (!id) {
