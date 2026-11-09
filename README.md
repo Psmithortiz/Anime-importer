@@ -98,8 +98,9 @@ All design decisions: [docs/design-decisions.md](docs/design-decisions.md)
 
 Download `AnimeImporter-vX.Y.Z-windows-x64.zip` from **Assets** in the
 [latest release](https://github.com/Psmithortiz/Anime-importer/releases/latest) (not "Source code"),
-unzip it and run `AnimeImporter.exe`. The executable is not signed, so Windows may show a SmartScreen
-warning: see [how to run it anyway](docs/setup.md#windows-app).
+unzip it, open the `AnimeImporter` folder inside and run `AnimeImporter.exe`. For the demo without
+API keys, double-click `AnimeImporter Demo.bat` in the same folder. The executable is not signed, so
+Windows may show a SmartScreen warning: see [how to run it anyway](docs/setup.md#windows-app).
 
 ### Demo without API keys (Docker)
 

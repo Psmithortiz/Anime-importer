@@ -158,7 +158,9 @@ Because it is already listening, the browser can be opened immediately (the OS q
 until the server accepts it), and there is no gap between "check that the port is free" and "use
 it". If the port is taken, the launcher asks `/api/info` to tell one of its own instances from
 another program. On Windows it uses `SO_EXCLUSIVEADDRUSE`, because `SO_REUSEADDR` would let a second
-process take a port that is already in use.
+process take a port that is already in use. The launcher also compares the mode of the instance that
+is already running: if it is the other mode, it starts its own on a free port instead of opening that
+one, which is safe because each mode uses its own database.
 
 ## Matching on real data
 

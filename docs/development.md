@@ -35,9 +35,13 @@ cover reopening a file, schema versions and cascading deletes.
 
 - **CI** (`.github/workflows/ci.yml`) runs the three commands above on Ubuntu and Windows for every
   pull request, and builds the Docker image with a demo-mode smoke test.
-- **Release** (`.github/workflows/release.yml`) runs when a `v*` tag is pushed. On Windows it checks
-  that the tag matches the version in `pyproject.toml`, runs the tests, builds the executable, starts
-  it in demo mode as a smoke test, and creates a draft release with the zip and its SHA-256 checksum.
+- **Release** (`.github/workflows/release.yml`) runs when a `v*` tag is pushed. It has two jobs:
+  - `windows` checks that the tag matches the version in `pyproject.toml`, runs the lint
+    (`ruff check` and `ruff format --check`) and the tests, builds the executable, smoke-tests the
+    `.exe` in normal mode and `AnimeImporter Demo.bat` in demo mode, and creates a draft release
+    with the zip and its SHA-256 checksum.
+  - `docker` runs after `windows`: it builds the image, smoke-tests it in demo mode and publishes it
+    to `ghcr.io/psmithortiz/anime-importer` with the version and `latest` tags.
 
 ## Build the Windows executable
 
@@ -45,7 +49,8 @@ cover reopening a file, schema versions and cascading deletes.
 uv run --group build pyinstaller packaging/anime-importer.spec --noconfirm
 ```
 
-The result is in `dist/AnimeImporter/`. PyInstaller lives in a separate `build` dependency group, so
+The result is in `dist/AnimeImporter/`. The spec also copies `AnimeImporter Demo.bat` next to the
+`.exe`. PyInstaller lives in a separate `build` dependency group, so
 `uv sync` and the CI test job do not install it.
 
 ## Publish a release
@@ -62,8 +67,15 @@ The result is in `dist/AnimeImporter/`. PyInstaller lives in a separate `build` 
    git push origin vX.Y.Z
    ```
 
-4. When the Release workflow finishes, download the zip from the draft release, test it, and click
-   **Publish release**.
+4. Publish the draft release:
+   1. Wait for both jobs of the Release workflow (`windows` and `docker`) to finish green.
+   2. Download the zip from the draft release and test it (normal mode and the `.bat`).
+   3. Above the generated notes, add a line "Windows: download
+      `AnimeImporter-vX.Y.Z-windows-x64.zip` below" and another with the image command:
+      `docker run --rm -p 127.0.0.1:8000:8000 ghcr.io/psmithortiz/anime-importer`.
+   4. If a bullet of the generated notes shows the branch name instead of the pull request title,
+      fix it.
+   5. Click **Publish release**.
 
 If the workflow fails, fix it through a pull request, delete the tag (`git push --delete origin
 vX.Y.Z` and `git tag -d vX.Y.Z`) and the draft release if one was created, and tag again.
