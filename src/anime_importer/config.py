@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Self
 
-from platformdirs import user_data_path
+from platformdirs import user_cache_path, user_data_path
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -9,6 +9,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 def _data_dir() -> Path:
     """Per-user data folder. Computing the path does not create it."""
     return user_data_path("anime-importer", appauthor=False)
+
+
+def _cache_dir() -> Path:
+    """Per-user cache folder. Computing the path does not create it."""
+    return user_cache_path("anime-importer", appauthor=False)
 
 
 class Settings(BaseSettings):
@@ -23,8 +28,8 @@ class Settings(BaseSettings):
     input_path: Path = Path("anime_list.txt")
     output_xml_path: Path = Path("output.xml")
     rejected_report_path: Path = Path("errores.txt")
-    normalization_cache_dir: Path = Path(".cache/normalization")
-    details_cache_path: Path = Path(".cache/mal_details.json")
+    normalization_cache_dir: Path = Field(default_factory=lambda: _cache_dir() / "normalization")
+    details_cache_path: Path = Field(default_factory=lambda: _cache_dir() / "mal_details.json")
     details_cache_ttl_days: float = 7
     franchise_max_nodes: int = 40
     resolution_buffer: int = 20

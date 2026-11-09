@@ -51,3 +51,34 @@ def test_host_and_port_are_read_from_the_environment(monkeypatch):
 
     assert settings.host == "0.0.0.0"
     assert settings.port == 9000
+
+
+def test_cache_paths_default_to_the_user_cache_dir():
+    from platformdirs import user_cache_path
+
+    settings = Settings(_env_file=None, demo=True)
+
+    folder = user_cache_path("anime-importer", appauthor=False)
+    assert settings.normalization_cache_dir == folder / "normalization"
+    assert settings.details_cache_path == folder / "mal_details.json"
+
+
+def test_computing_the_default_cache_paths_creates_no_folders(monkeypatch, tmp_path):
+    from anime_importer import config
+
+    monkeypatch.setattr(config, "_cache_dir", lambda: tmp_path / "cache")
+
+    settings = Settings(_env_file=None, demo=True)
+
+    assert settings.normalization_cache_dir == tmp_path / "cache" / "normalization"
+    assert not (tmp_path / "cache").exists()
+
+
+def test_cache_paths_come_from_the_environment(monkeypatch, tmp_path):
+    monkeypatch.setenv("NORMALIZATION_CACHE_DIR", str(tmp_path / "norm"))
+    monkeypatch.setenv("DETAILS_CACHE_PATH", str(tmp_path / "details.json"))
+
+    settings = Settings(_env_file=None, demo=True)
+
+    assert settings.normalization_cache_dir == tmp_path / "norm"
+    assert settings.details_cache_path == tmp_path / "details.json"
