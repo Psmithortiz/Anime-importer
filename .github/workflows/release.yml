@@ -29,7 +29,9 @@ jobs:
         run: uv sync --locked --group build
       # A tag can point at any commit, so the checks run again here.
       - name: Lint
-        run: uv run ruff check src tests
+        run: |
+          uv run ruff check src tests scripts
+          uv run ruff format --check src tests scripts
       - name: Test
         run: uv run pytest
       - name: Build the executable
