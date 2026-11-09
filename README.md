@@ -175,8 +175,8 @@ invalidates the other.
 
 **A small, safe container.** The image is built in two stages: the first resolves dependencies with
 uv (cached as its own layer, so code changes don't reinstall them), the second copies only the
-virtual environment and runs as a non-root user. `.dockerignore` is an allowlist, so `.env` and local
-caches can never end up in the image; keys are passed at run time. The server binds to `0.0.0.0`
+virtual environment and runs as a non-root user. `.dockerignore` is an allowlist, so local
+caches and secrets can never end up in the image; keys are entered at run time. The server binds to `0.0.0.0`
 only inside the container (through the `HOST` setting, so there is still a single entry point),
 and compose publishes it on `127.0.0.1` only, because the app has no authentication.
 
@@ -187,7 +187,7 @@ Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 ### Try it without API keys
 
 Demo mode replays real Gemini and MyAnimeList responses recorded for a sample list, so it needs
-no `.env` and no network access to the APIs:
+no API keys and no network access to the APIs:
 
 ```bash
 DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
@@ -203,12 +203,12 @@ The sample list is preloaded. Titles outside it won't be found.
 docker compose up --build
 ```
 
-Open <http://127.0.0.1:8000>. It starts in demo mode. To use your own keys, put the `.env` file in
-the project root and run `DEMO=0 docker compose up` (PowerShell: `$env:DEMO="0"; docker compose up`).
+Open <http://127.0.0.1:8000>. It starts in demo mode. To use your own keys, run
+`DEMO=0 docker compose up` (PowerShell: `$env:DEMO="0"; docker compose up`) and enter the keys in the
+Settings screen.
 Normalization and MAL caches, and your sessions, are kept in Docker volumes between runs.
-Docker keeps using `.env` for the keys: they reach the container as environment variables, so the
-Settings link is hidden there.
-The sessions volume (`data`) is user data: unlike the cache volume, do not delete it to free space.
+The `data` volume also holds the config file with your keys (`/home/app/data/config.json`). It is
+user data: unlike the cache volume, do not delete it to free space.
 
 ### Quick run (no clone)
 
@@ -218,9 +218,9 @@ With [uv](https://docs.astral.sh/uv/) installed, you can run the web UI straight
 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
 ```
 
-Run it from a folder that contains your `.env` file (see below), or put your keys in the per-user
-config file (see "Where files are stored"). Caches and sessions live in per-user folders, not in the
-current directory.
+Open the Settings screen it shows and enter your keys: they are saved in the per-user config file
+(see "Where files are stored"). Caches and sessions live in per-user folders too, so it does not
+matter which folder you run it from.
 
 ### From source
 
@@ -232,12 +232,16 @@ uv sync
 
 The app starts even without API keys and shows a **Settings** screen that asks for them (links
 to Google AI Studio and MAL's API page included). The keys are saved in the per-user config file
-(see below). Alternatively, set them yourself, for example in a `.env` file in the project root:
+(see below). Get them at https://aistudio.google.com/apikey (Gemini) and
+https://myanimelist.net/apiconfig (MAL client ID). Environment variables still work and win over the
+file:
 
 ```
-GEMINI_API_KEY=your_gemini_key        # from https://aistudio.google.com/apikey
-MAL_CLIENT_ID=your_mal_client_id      # from https://myanimelist.net/apiconfig
+GEMINI_API_KEY=your_gemini_key
+MAL_CLIENT_ID=your_mal_client_id
 ```
+
+A `.env` file is **not** read.
 
 The CLI (`anime-importer`) has no settings screen: without keys it names the missing ones and exits
 with code 2.
@@ -256,16 +260,16 @@ Caches, sessions and settings live in per-user folders, never in the current fol
 | Sessions | see below | `DATABASE_PATH` (`DEMO_DATABASE_PATH` in demo mode) |
 | Config file | `%LOCALAPPDATA%\anime-importer\config.json` / `~/.config/anime-importer/config.json` / `~/Library/Application Support/anime-importer/config.json` | `ANIME_IMPORTER_CONFIG_FILE` |
 
-Settings are read in this order of priority (highest first): environment variables, `.env`, the
+Settings are read in this order of priority (highest first): environment variables, the
 config file (a JSON object such as `{"gemini_api_key": "...", "mal_client_id": "..."}`), and the
 defaults. A missing config file is ignored; an invalid one stops the app with an error naming it.
 Computing these paths creates nothing: folders are created when something is first written.
 
-**The Settings screen.** It shows where each key comes from (environment, `.env` or config file)
+**The Settings screen.** It shows where each key comes from (environment variable or config file)
 and the last 4 characters of the saved key, never the full value. A key that comes from the
-environment or `.env` cannot be edited there (it would be overridden anyway): change it where it is
-defined. The link in the header is hidden in demo mode and when every key comes from the
-environment. If the app started without keys, saving them starts it right away. If it was already
+environment cannot be edited there (it would be overridden anyway): change it where it is
+defined (if every key comes from the environment, the screen says so and Save is disabled). The
+link in the header is only hidden in demo mode. If the app started without keys, saving them starts it right away. If it was already
 configured, the new keys are saved but the running app keeps the old ones until you restart it:
 the adapters (MAL throttle, caches) are built once per app, and a second set would share neither.
 The config file is created with owner-only permissions on Linux and macOS; on Windows it inherits
@@ -276,7 +280,10 @@ the permissions of your user folder.
 browser talk to the local server under another name). If you expose the app under another name,
 add it with `ALLOWED_HOSTS` as a JSON list, e.g. `ALLOWED_HOSTS='["127.0.0.1","localhost","anime.lan"]'`.
 
-**Upgrading from an earlier version.** Caches used to live in `.cache/` inside the folder where the
+**Upgrading from an earlier version.** If you used a `.env` file, it is no longer read: paste your
+keys in the Settings screen (or use environment variables).
+
+Caches used to live in `.cache/` inside the folder where the
 app was run. To keep them (and not spend Gemini quota again), move the contents of
 `.cache/normalization` and the file `.cache/mal_details.json` to the new cache folder. Nothing is
 migrated automatically.
