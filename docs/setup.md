@@ -16,7 +16,7 @@ limits) come after.
 | Option | Best for | You need | Demo without keys |
 | --- | --- | --- | --- |
 | [Windows app](#windows-app) | Using it on Windows | Nothing else | Yes |
-| [Docker](#docker) | macOS or Linux, or a quick look | Docker (Git only to build from source) | Yes (the default) |
+| [Docker](#docker) | macOS or Linux, or a quick look | Docker (Git only to build from source) | Yes |
 | [uvx](#uvx) | Running it without keeping a copy of the code | uv and Git | Yes |
 | [From source](#from-source) | Reading or changing the code | uv and Git | Yes |
 
