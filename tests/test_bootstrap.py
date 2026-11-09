@@ -115,3 +115,16 @@ def test_restore_session_returns_none_for_unknown_ids(tmp_path):
     restored = services.restore_session("known")
     assert restored is not None
     assert restored.id == "known"
+
+
+def test_session_services_can_back_a_registry(tmp_path):
+    from anime_importer.api.registry import SessionRegistry
+
+    (tmp_path / "recording.json").write_text(EMPTY_RECORDING, encoding="utf-8")
+    settings = Settings(_env_file=None, demo=True, demo_data_dir=tmp_path)
+    services = bootstrap.build_services(settings, InMemorySessionRepository())
+    registry = SessionRegistry(services, run_in_background=lambda fn: None)
+
+    managed = registry.create(["a", "b"])
+
+    assert [item.id for item in registry.list_recent(5)] == [managed.id]

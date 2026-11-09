@@ -4,7 +4,7 @@ import uuid
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from anime_importer.api.schemas import (
     ProgressOut,
@@ -21,16 +21,20 @@ from anime_importer.services.import_session import (
     BackgroundRunner,
     ImportSession,
     ResolutionError,
+    start_daemon_thread,
 )
-
-if TYPE_CHECKING:
-    from anime_importer.bootstrap import SessionServices
 
 logger = logging.getLogger(__name__)
 
 
-def _start_thread(work: Callable[[], None]) -> None:
-    threading.Thread(target=work, daemon=True).start()
+class SessionProvider(Protocol):
+    """What the registry needs to create, restore and list sessions."""
+
+    def new_session(self, session_id: str, titles: Sequence[str]) -> ImportSession: ...
+
+    def restore_session(self, session_id: str) -> ImportSession | None: ...
+
+    def list_recent(self, limit: int) -> list[SessionSummary]: ...
 
 
 class SessionNotFoundError(Exception):
@@ -170,7 +174,7 @@ class SessionRegistry:
     """Sessions of the app. Sessions not in memory are rebuilt lazily from the repository."""
 
     def __init__(
-        self, services: "SessionServices", run_in_background: BackgroundRunner = _start_thread
+        self, services: SessionProvider, run_in_background: BackgroundRunner = start_daemon_thread
     ) -> None:
         self._services = services
         self._run_in_background = run_in_background
@@ -211,7 +215,7 @@ class SessionRegistry:
         return managed
 
     def list_recent(self, limit: int) -> list[SessionSummary]:
-        return self._services.repository.list_recent(limit)
+        return self._services.list_recent(limit)
 
     def _load(self, session_id: str) -> ManagedSession:
         session = self._services.restore_session(session_id)

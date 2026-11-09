@@ -90,7 +90,7 @@ class _Cursor:
         return _Cursor(self.position, list(self.imported), list(self.rejected), self.current)
 
 
-def _start_thread(work: Callable[[], None]) -> None:
+def start_daemon_thread(work: Callable[[], None]) -> None:
     threading.Thread(target=work, daemon=True).start()
 
 
@@ -116,7 +116,7 @@ class ImportSession:
         repository: SessionRepository,
         franchise_finder: FranchiseFinder | None = None,
         resolution_buffer: int = 20,
-        run_in_background: BackgroundRunner = _start_thread,
+        run_in_background: BackgroundRunner = start_daemon_thread,
     ) -> None:
         self._id = stored.id
         self._titles = list(stored.titles)

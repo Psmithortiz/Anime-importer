@@ -17,6 +17,7 @@ from anime_importer.adapters.mal import MalDetailsProvider, MalSearcher
 from anime_importer.adapters.normalization_cache import CachingNormalizer, JsonCacheStore
 from anime_importer.config import Settings
 from anime_importer.domain.models import Franchise
+from anime_importer.domain.session import SessionSummary
 from anime_importer.ports import (
     AnimeDetailsProvider,
     AnimeSearcher,
@@ -85,6 +86,9 @@ class SessionServices:
 
     def new_session(self, session_id: str, titles: Sequence[str]) -> ImportSession:
         return ImportSession.create(session_id, titles, repository=self.repository, **self._deps())
+
+    def list_recent(self, limit: int) -> list[SessionSummary]:
+        return self.repository.list_recent(limit)
 
     def restore_session(self, session_id: str) -> ImportSession | None:
         """Rebuild a stored session, or None if it does not exist."""

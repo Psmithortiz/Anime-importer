@@ -106,10 +106,12 @@ class CountingServices:
     def __init__(self, inner) -> None:
         self._inner = inner
         self.restores = 0
-        self.repository = inner.repository
 
     def new_session(self, session_id, titles):
         return self._inner.new_session(session_id, titles)
+
+    def list_recent(self, limit):
+        return self._inner.list_recent(limit)
 
     def restore_session(self, session_id):
         self.restores += 1
