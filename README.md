@@ -37,7 +37,14 @@ layered architecture, tests and a proper API, built as a backend portfolio proje
   movies next to the candidates, so one line of the list can import a whole series.
 - **Look-ahead resolution**: a background worker resolves upcoming titles while you answer, after a
   short initial buffer, so most questions appear instantly.
-- **Keyboard-first**: `1`–`9` to select, `Enter` to confirm, `X` to discard.
+- **Keyboard-first**: `1`–`9` to select, `Enter` to confirm, `X` to discard, `Ctrl+Z` to undo.
+- **Resumable sessions**: every import is saved in SQLite, so you can restart the server and pick
+  up exactly where you left off, even after a failure.
+- **Unlimited undo** with `Ctrl+Z`: step back through your answers one by one, also after the
+  last question.
+- **Recent sessions** on the start screen, to reopen any import in progress or finished.
+- **Retry when MAL fails**: a session that stopped because a lookup failed is rebuilt from the
+  database with one click, without losing a single answer.
 - **REST API** documented automatically at `/docs`, plus an interactive CLI.
 - **Demo mode** (`DEMO=1`): replays recorded Gemini and MAL responses, so you can try the whole
   flow without API keys.
@@ -67,11 +74,17 @@ MAL XML export (import with "Don't overwrite entries already on my list")
 
 ```
 src/anime_importer/
-├── domain/        Pure models and rules: dataclasses, enums, matching. No I/O, no frameworks.
-├── ports.py       Protocols the core depends on (AnimeSearcher, TitleNormalizer) and their errors.
+├── domain/        Pure models and rules. No I/O, no frameworks.
+│   ├── models.py, matching.py   Dataclasses, enums and fuzzy matching.
+│   └── session.py               Steps, resolutions, user decisions and stored snapshots.
+├── ports.py       Protocols the core depends on (AnimeSearcher, TitleNormalizer,
+│                  SessionRepository) and their errors.
 ├── adapters/      The outside world: Gemini, MAL, caches, XML and text files, demo replay.
+│   ├── sqlite_repository.py     Sessions in SQLite (one connection per operation, WAL).
+│   ├── memory_repository.py     The same contract in memory (CLI and tests).
+│   └── session_codec.py         JSON serialization of resolutions and decisions.
 ├── services/      ImportSession: the state machine that drives an import and pauses for questions.
-├── api/           FastAPI app, Pydantic schemas, in-memory session registry and the static frontend.
+├── api/           FastAPI app, Pydantic schemas, session registry and the static frontend.
 ├── cli.py         Interactive terminal interface over the same service.
 └── bootstrap.py   Composition root: the only place that wires concrete adapters together.
 ```
@@ -101,6 +114,18 @@ half-updated.
 serializes actions on a session (a double click can't advance it twice), but reads never take the lock,
 so polling stays responsive. Endpoints are plain `def`: they call blocking code, which FastAPI runs in a
 thread pool instead of stalling the event loop.
+
+**Sessions as an event log.** What gets saved is the input list, what Gemini and MAL computed for
+each title, and the user's decisions, identified by query text and MAL id rather than by option
+number. The state of a session is never stored: it is rebuilt by replaying those decisions over the
+stored results, which is how a session resumes after a restart. Every fact is saved *before* it is
+applied, so nothing is ever applied that could not be persisted. Undo is just removing the last
+decision and replaying: it returns to the last answered question and never repeats a search, because
+the results and the answers to earlier searches are kept. The consumer-side state is published with
+copy-on-write (each action works on a copy and swaps it in with a single assignment), so the
+lock-free readers behind the polling endpoint never see a half-applied step. The adapters are built
+once per app and shared by all sessions, so MAL's rate limit and the JSON caches are not duplicated
+when several sessions are open.
 
 **Franchise discovery as a breadth-first search.** MAL only exposes `related_anime` on each anime's
 detail endpoint, so the franchise is a graph explored one request per node. Relations are mutual
@@ -180,7 +205,8 @@ docker compose up --build
 
 Open <http://127.0.0.1:8000>. It starts in demo mode. To use your own keys, put the `.env` file in
 the project root and run `DEMO=0 docker compose up` (PowerShell: `$env:DEMO="0"; docker compose up`).
-Normalization and MAL caches are kept in a Docker volume between runs.
+Normalization and MAL caches, and your sessions, are kept in Docker volumes between runs.
+The sessions volume (`data`) is user data: unlike the cache volume, do not delete it to free space.
 
 ### Quick run (no clone)
 
@@ -208,8 +234,18 @@ GEMINI_API_KEY=your_gemini_key        # from Google AI Studio
 MAL_CLIENT_ID=your_mal_client_id      # from https://myanimelist.net/apiconfig
 ```
 
-Optional settings: `GEMINI_MODEL`, `GEMINI_CHUNK_SIZE` (default 20) and `NORMALIZATION_CACHE_DIR`
-(default `.cache/normalization`).
+Optional settings: `GEMINI_MODEL`, `GEMINI_CHUNK_SIZE` (default 20), `NORMALIZATION_CACHE_DIR`
+(default `.cache/normalization`) and `DATABASE_PATH` (see below).
+
+### Where sessions are stored
+
+Sessions live in a SQLite file named `sessions.db` (`demo.db` in demo mode) inside the per-user data
+folder of your system: `%LOCALAPPDATA%\anime-importer` on Windows, `~/.local/share/anime-importer`
+on Linux and `~/Library/Application Support/anime-importer` on macOS. Set `DATABASE_PATH` (and
+`DEMO_DATABASE_PATH`) to use another location. It is not the current folder on purpose: with
+`uvx` the server can be started from anywhere, and a fixed location keeps "Recent sessions"
+complete no matter where you launch it. Computing the path creates nothing; the folder is created
+when the app starts.
 
 ## Usage
 
@@ -249,13 +285,16 @@ uv run ruff check src tests
 The suite runs without network access, API keys or real waits: adapters accept injected
 sessions, clients, clocks and sleep functions.
 
+The session repository is covered by contract tests: the same battery runs against the in-memory
+and the SQLite implementations, so both are guaranteed to behave identically. SQLite-only tests
+cover reopening a file, schema versions and cascading deletes.
+
 CI runs both commands on Ubuntu and Windows for every pull request, and builds the Docker image
 with a demo-mode smoke test.
 
 ## Roadmap
 
 - Full pipeline: overlap Gemini normalization and MAL resolution.
-- Undo the last decision.
 
 ## Results
 
