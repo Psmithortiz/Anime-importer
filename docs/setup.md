@@ -53,8 +53,9 @@ The commands above are for bash; each section has the full commands, with the Po
 
 - **Windows app** (and `anime-importer-app`): both modes can run at the same time. If the other mode
   is already open, the new one starts on another port.
-- **The other options** use port 8000: stop the running one with `Ctrl+C` first, or start the second
-  one with another `PORT`.
+- **The other options** use port 8000: stop the running one with `Ctrl+C` first, or start the
+  second one on another port (`PORT=8001`; with Docker, publish another host port, such as
+  `-p 127.0.0.1:8001:8000`).
 - **PowerShell:** `$env:DEMO="1"` stays set in that window until you close it, so a later command in
   the same window also starts in demo mode. Open a new window, or run `Remove-Item Env:DEMO`. In
   bash, `DEMO=1 command` only affects that command.
@@ -215,15 +216,28 @@ Runs the app straight from GitHub without keeping a copy of the code.
 **You need:** [uv](https://docs.astral.sh/uv/getting-started/installation/) and
 [Git](https://git-scm.com/downloads). uv downloads Python 3.13 by itself if you don't have it.
 
-| | macOS / Linux (bash) | Windows (PowerShell) |
-| --- | --- | --- |
-| Normal mode | `uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` | same command |
-| Demo mode | `DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` | `$env:DEMO="1"; uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web` |
+Normal mode (any system):
+
+```bash
+uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
+```
+
+Demo mode on macOS / Linux (bash):
+
+```bash
+DEMO=1 uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
+```
+
+Demo mode on Windows (PowerShell):
+
+```powershell
+$env:DEMO="1"; uvx --from git+https://github.com/Psmithortiz/Anime-importer anime-importer-web
+```
 
 In normal mode the app asks for your keys in its Settings screen (see
 [Get your API keys](#2-get-your-api-keys)). When the terminal shows `Application startup complete`,
-open <http://127.0.0.1:8000> in your browser. Stop it with `Ctrl+C`. It does not matter which folder you run it from: keys, sessions and caches are stored in
-your user folders.
+open <http://127.0.0.1:8000> in your browser. Stop it with `Ctrl+C`. It does not matter which
+folder you run it from: keys, sessions and caches are stored in your user folders.
 
 To get the latest version, add `--refresh` after `uvx`.
 
