@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  windows:
+    name: windows
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Check that the tag matches the project version
+        run: |
+          $version = uv run --no-sync python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            Write-Error "Tag $env:GITHUB_REF_NAME does not match project.version $version in pyproject.toml"
+            exit 1
+          }
+      - name: Install dependencies
+        run: uv sync --locked --group build
+      # A tag can point at any commit, so the checks run again here.
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Test
+        run: uv run pytest
+      - name: Build the executable
+        run: uv run pyinstaller packaging/anime-importer.spec --noconfirm
+      # Checks the bundle itself (static files, demo_data, uvicorn imports), which the test job
+      # does not cover because it runs from the source tree.
+      - name: Smoke test the frozen executable
+        run: |
+          $env:DEMO = "1"
+          $app = Start-Process -FilePath "dist/AnimeImporter/AnimeImporter.exe" -PassThru
+          $ok = $false
+          try {
+            $deadline = (Get-Date).AddSeconds(60)
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $root = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing
+                $info = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/info"
+                # /api/sessions proves the sessions database could be created.
+                $sessions = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/sessions" -UseBasicParsing
+                if ($root.StatusCode -eq 200 -and $sessions.StatusCode -eq 200 -and $info.app -eq "anime-importer" -and $info.demo -eq $true) {
+                  $ok = $true
+                  break
+                }
+              } catch {
+                # Not up yet.
+              }
+              Start-Sleep -Seconds 1
+            }
+          } finally {
+            Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          }
+          if (-not $ok) {
+            Write-Error "The packaged app did not answer correctly within 60 seconds"
+            exit 1
+          }
+          Write-Host "Smoke test passed"
+      - name: Package
+        run: |
+          $zip = "AnimeImporter-$env:GITHUB_REF_NAME-windows-x64.zip"
+          Compress-Archive -Path "dist/AnimeImporter" -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "$zip.sha256" -Value "$hash  $zip" -Encoding ascii
+          "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME $env:ZIP "$env:ZIP.sha256" --draft --title "Anime Importer $env:GITHUB_REF_NAME" --generate-notes
