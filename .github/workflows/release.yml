@@ -36,38 +36,48 @@ jobs:
         run: uv run pytest
       - name: Build the executable
         run: uv run pyinstaller packaging/anime-importer.spec --noconfirm
-      # Checks the bundle itself (static files, demo_data, uvicorn imports), which the test job
-      # does not cover because it runs from the source tree.
+      # Checks the bundle itself (static files, demo_data, uvicorn imports, the demo launcher),
+      # which the test job does not cover because it runs from the source tree. DEMO is not set
+      # here: the normal mode must be the default and the .bat must set the demo mode itself.
       - name: Smoke test the frozen executable
         run: |
-          $env:DEMO = "1"
-          $app = Start-Process -FilePath "dist/AnimeImporter/AnimeImporter.exe" -PassThru
-          $ok = $false
-          try {
-            $deadline = (Get-Date).AddSeconds(60)
-            while ((Get-Date) -lt $deadline) {
-              try {
-                $root = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing
-                $info = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/info"
-                # /api/sessions proves the sessions database could be created.
-                $sessions = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/sessions" -UseBasicParsing
-                if ($root.StatusCode -eq 200 -and $sessions.StatusCode -eq 200 -and $info.app -eq "anime-importer" -and $info.demo -eq $true) {
-                  $ok = $true
-                  break
+          function Test-Launch([string]$Path, [bool]$ExpectedDemo, [string]$Mode) {
+            Start-Process -FilePath $Path | Out-Null
+            $ok = $false
+            try {
+              $deadline = (Get-Date).AddSeconds(60)
+              while ((Get-Date) -lt $deadline) {
+                try {
+                  $root = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing
+                  $info = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/info"
+                  # /api/sessions proves the sessions database could be created.
+                  $sessions = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/sessions" -UseBasicParsing
+                  if ($root.StatusCode -eq 200 -and $sessions.StatusCode -eq 200 -and $info.app -eq "anime-importer" -and $info.demo -eq $ExpectedDemo) {
+                    $ok = $true
+                    break
+                  }
+                } catch {
+                  # Not up yet.
                 }
-              } catch {
-                # Not up yet.
+                Start-Sleep -Seconds 1
               }
-              Start-Sleep -Seconds 1
+            } finally {
+              # With the .bat, Start-Process returns cmd.exe, not the .exe: stop by name.
+              Stop-Process -Name AnimeImporter -Force -ErrorAction SilentlyContinue
+              # The next case must find port 8000 free, or it would start on another port.
+              $freed = (Get-Date).AddSeconds(30)
+              while ((Get-Date) -lt $freed -and (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue)) {
+                Start-Sleep -Seconds 1
+              }
             }
-          } finally {
-            Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+            if (-not $ok) {
+              Write-Error "The packaged app did not answer correctly in $Mode mode within 60 seconds"
+              exit 1
+            }
+            Write-Host "Smoke test passed in $Mode mode"
           }
-          if (-not $ok) {
-            Write-Error "The packaged app did not answer correctly within 60 seconds"
-            exit 1
-          }
-          Write-Host "Smoke test passed"
+          Test-Launch "dist/AnimeImporter/AnimeImporter.exe" $false "normal"
+          Test-Launch "dist/AnimeImporter/AnimeImporter Demo.bat" $true "demo"
       - name: Package
         run: |
           $zip = "AnimeImporter-$env:GITHUB_REF_NAME-windows-x64.zip"

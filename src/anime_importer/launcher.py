@@ -1,4 +1,8 @@
-"""Desktop launcher: starts the web app on a free local port and opens the browser."""
+"""Desktop launcher: starts the web app on a free local port and opens the browser.
+
+If the preferred port already runs our app in the same mode (normal or demo), it only opens that
+instance; in the other mode, it starts its own on a free port (each mode has its own database).
+"""
 
 import json
 import socket
@@ -42,13 +46,20 @@ def _get_json(url: str) -> Any:
         return json.load(response)
 
 
-def is_our_app(url: str, get_json: GetJson = _get_json) -> bool:
-    """True if `url` answers /api/info like Anime Importer does."""
+def running_mode(url: str, get_json: GetJson = _get_json) -> bool | None:
+    """The `demo` flag of the Anime Importer at `url`, or None if it is not one (or does not say)."""
     try:
         data = get_json(f"{url}api/info")
     except Exception:  # noqa: BLE001 (any failure means "not our app")
-        return False
-    return isinstance(data, dict) and data.get("app") == "anime-importer"
+        return None
+    if not isinstance(data, dict) or data.get("app") != "anime-importer":
+        return None
+    demo = data.get("demo")
+    return demo if isinstance(demo, bool) else None
+
+
+def _mode_name(demo: bool) -> str:
+    return "demo" if demo else "normal"
 
 
 def _serve(settings: Settings, sock: socket.socket) -> None:
@@ -68,11 +79,18 @@ def main(
     try:
         sock = bind_socket(HOST, settings.port)
     except OSError:
-        if is_our_app(preferred_url, get_json):
+        running = running_mode(preferred_url, get_json)
+        if running is None:
+            print(f"Port {settings.port} is in use by another program; using a free port instead.")
+        elif running == settings.demo:
             print(f"Anime Importer is already running at {preferred_url}")
             open_browser(preferred_url)
             return 0
-        print(f"Port {settings.port} is in use by another program; using a free port instead.")
+        else:
+            print(
+                f"Anime Importer is already running in {_mode_name(running)} mode at "
+                f"{preferred_url}; starting {_mode_name(settings.demo)} mode on a free port."
+            )
         sock = bind_socket(HOST, 0)
     with sock:
         port = sock.getsockname()[1]
