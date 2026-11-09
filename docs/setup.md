@@ -16,7 +16,7 @@ limits) come after.
 | Option | Best for | You need | Demo without keys |
 | --- | --- | --- | --- |
 | [Windows app](#windows-app) | Using it on Windows | Nothing else | Yes |
-| [Docker](#docker) | macOS or Linux, or a quick look | Docker and Git | Yes (the default) |
+| [Docker](#docker) | macOS or Linux, or a quick look | Docker (Git only to build from source) | Yes (the default) |
 | [uvx](#uvx) | Running it without keeping a copy of the code | uv and Git | Yes |
 | [From source](#from-source) | Reading or changing the code | uv and Git | Yes |
 
@@ -76,18 +76,56 @@ are not stored in it (see [Where files are stored](#where-files-are-stored)).
 
 **You need:**
 [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS) or Docker Engine
-with the Compose plugin (Linux), running; and [Git](https://git-scm.com/downloads). Python is not
-needed.
+(Linux), running. Python is not needed. Git is needed only to build from source.
 
-1. **Get the code.** The image is built from the source, so you need a copy of the repository. In a
-   terminal:
+There are two ways: run the published image, or build it from the source with Compose.
+
+#### Published image (no Git needed)
+
+The image is `ghcr.io/psmithortiz/anime-importer` and exists since v0.2.0. Start it:
+
+macOS / Linux (bash):
+
+```bash
+docker run --rm -p 127.0.0.1:8000:8000 \
+  -v anime-importer-cache:/home/app/.cache \
+  -v anime-importer-data:/home/app/data \
+  ghcr.io/psmithortiz/anime-importer
+```
+
+Windows (PowerShell):
+
+```powershell
+docker run --rm -p 127.0.0.1:8000:8000 `
+  -v anime-importer-cache:/home/app/.cache `
+  -v anime-importer-data:/home/app/data `
+  ghcr.io/psmithortiz/anime-importer
+```
+
+Without `-e DEMO=1` it starts in real mode and asks for your keys in its Settings screen (see
+[Get your API keys](#2-get-your-api-keys)). Add `-e DEMO=1` to start the demo instead. Then open
+<http://127.0.0.1:8000> in your browser. Stop it with `Ctrl+C`.
+
+The named volumes keep your keys, sessions and caches between runs. They are different from the
+volumes that Compose creates, so the two ways do not share data.
+
+**Update** to the newest version:
+
+```bash
+docker pull ghcr.io/psmithortiz/anime-importer:latest
+```
+
+#### Build from source (Compose)
+
+1. **Get the code.** The image is built from the source, so you need a copy of the repository
+   and [Git](https://git-scm.com/downloads). In a terminal:
 
    ```bash
    git clone https://github.com/Psmithortiz/Anime-importer
    cd Anime-importer
    ```
 
-2. **Start it**, from that folder:
+2. **Start it**, from that folder (Docker Engine needs the Compose plugin):
 
    | | macOS / Linux (bash) | Windows (PowerShell) |
    | --- | --- | --- |

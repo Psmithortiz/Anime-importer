@@ -103,6 +103,14 @@ warning: see [how to run it anyway](docs/setup.md#windows-app).
 
 ### Demo without API keys (Docker)
 
+Without cloning anything:
+
+```bash
+docker run --rm -e DEMO=1 -p 127.0.0.1:8000:8000 ghcr.io/psmithortiz/anime-importer
+```
+
+Or building from the source with Compose:
+
 ```bash
 docker compose up --build
 ```
